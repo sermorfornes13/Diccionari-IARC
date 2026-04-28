@@ -122,12 +122,14 @@ dicc_can <- setDT(read.xlsx('WG specific variables_final_202604.xlsx'))
 setnames(dicc_can, names(dicc_can), gsub('.', '_', names(dicc_can), fixed = T))
 names(dicc_can) <- c('wg_abbrev', 'wg_cancersite', 'code', 'subcategory', 'definition', 'comments')
 
-vars_to_modif <- names(dicc_can)[1:3]
+vars_to_modif <- names(dicc_can)[1:4]
 
 dicc_can <- setDT(dicc_can %>% 
   fill(vars_to_modif) %>% 
   fill(vars_to_modif, .direction = 'down') %>%
   distinct)
+
+dicc_can <- dicc_can[!(wg_abbrev == 'Lymp' & is.na(definition))]
 
 # comencem a treballar amb les definicions de càncer
 # seguirem l'ordre del diccionari per fer les definicions
@@ -464,7 +466,7 @@ rm(kidn, morfo, cat)
 if(candiag[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
   # per aquest començarem a incorporar les subcategories i inclusions/exclusions
   live <- copy(candiag[grepl('^C22|^C23|^C24', locatum, ignore.case = T), 
-                       .(id, datadiag, locatum, morfotum, tipustum, clas_iarc = 'Live')])
+                       .(id, datadiag, locatum, morfotum, tipustum, defcancer1, clas_iarc = 'Live')])
   
   # carcinoma hepatocel·lular
   cat <- dicc_can[wg_abbrev == 'Live' & subcategory == 'HCC- Hepatocellular carcinoma']$definition
@@ -477,7 +479,7 @@ if(candiag[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
   morfo[, V1 := gsub("'", '', V1)]
   morfo[, V2 := gsub("\\('", '', gsub("'\\)", '', gsub("','", '|', V2, fixed = T)))]
   
-  hcc <- morfo[, {
+  d_hcc <- morfo[, {
     val <- unlist(strsplit(V2, "\\|")) # extrau els valors de cada part de la variable V2
     rbindlist(lapply(val, function(x) { # transforma la taula de manera que se'm queda per cada part
       part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE) # el valor de la variable V1 com var1
@@ -485,8 +487,14 @@ if(candiag[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
     }))
   }, by = 1:nrow(morfo)][, .(var1, var2, var3)] # ens crea la variable nrow que no ens fa falta però és necessari crear-la per separar la taula
   
-  live <- merge(live, hcc[, .(locatum = var1, morfotum = var2, tipustum = var3, hcc = 1)], 
+  live <- merge(live, d_hcc[, .(locatum = var1, morfotum = var2, tipustum = var3, hcc = 1)], 
                 by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
+
+  # 28/4/26: incloem correccions per la variable basis_diag1 (defcancer1 per a nosaltres)
+  live[!is.na(hcc) & locatum == 'C220' & morfotum %in% d_hcc[var1 == 'C220']$var2 & tipustum == 3 & 
+         defcancer1 %in% c(53,54,56,60), hcc := 0]
+  live[!is.na(hcc) & locatum == 'C221' & morfotum %in% d_hcc[var1 == 'C221']$var2 & tipustum == 3 & 
+         defcancer1 %in% c(53,54,56,60), hcc := 0]
   
   # carcinoma hepatocel·lular, definició més laxa
   cat <- dicc_can[wg_abbrev == 'Live' & subcategory %in% c('HCC- Hepatocellular carcinoma',
@@ -504,7 +512,7 @@ if(candiag[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
   morfo[, V1 := gsub("'", '', V1)]
   morfo[, V2 := gsub("\\('", '', gsub("'\\)", '', gsub("','", '|', V2, fixed = T)))]
   
-  hcc_w <- unique(morfo[, {
+  d_hcc_w <- unique(morfo[, {
     val <- unlist(strsplit(V2, "\\|")) 
     rbindlist(lapply(val, function(x) {
       part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE) 
@@ -513,10 +521,19 @@ if(candiag[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
   }, by = 1:nrow(morfo)][, .(var1, var2, var3)])
   
   # 23/4/26: hi ha un comentari en què diu que s'ha d'afegit un codi concret a la taula en absència d'una variable
-  hcc_w <- unique(rbind(hcc_w, data.table(var1 = 'C220', var2 = c(8000, 8140), var3 = 3))[order(var1, var2)])
+  d_hcc_w <- unique(rbind(d_hcc_w, data.table(var1 = 'C220', var2 = c(8000, 8140), var3 = 3))[order(var1, var2)])
+  d_hcc_w <- unique(rbind(d_hcc, d_hcc_w)[order(var1, var2, var3)])
   
-  live <- merge(live, hcc_w[, .(locatum = var1, morfotum = var2, tipustum = var3, hcc_w = 1)], 
+  live <- merge(live, d_hcc_w[, .(locatum = var1, morfotum = var2, tipustum = var3, hcc_w = 1)], 
                 by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
+  
+  # 28/4/26: incloem correccions per la variable basis_diag1 (defcancer1 per a nosaltres)
+  live[!is.na(hcc_w) & locatum == 'C220' & morfotum %in% d_hcc_w[var1 == 'C220']$var2 & tipustum == 3 & 
+         defcancer1 %in% c(53,54,56,60), hcc_w := 0]
+  live[!is.na(hcc_w) & locatum == 'C221' & morfotum %in% d_hcc_w[var1 == 'C220']$var2 & tipustum == 3 & 
+         defcancer1 %in% c(53,54,56,60), hcc_w := 0]
+  live[!is.na(hcc_w) & locatum == 'C220' & morfotum %in% c(8000, 8010) & tipustum == 3 & 
+         !defcancer1 %in% c(20,25,50,55,70), d_hcc_w := 0]
   
   # conducte biliar
   cat <- dicc_can[wg_abbrev == 'Live' & subcategory == 'IBD - Intrahepatic bile duct']$definition
@@ -529,7 +546,7 @@ if(candiag[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
   morfo[, V1 := gsub("'", '', V1)]
   morfo[, V2 := gsub("\\('", '', gsub("'\\)", '', gsub("','", '|', V2, fixed = T)))]
   
-  ibd <- morfo[, {
+  d_ibd <- morfo[, {
     val <- unlist(strsplit(V2, "\\|")) # extrau els valors de cada part de la variable V2
     rbindlist(lapply(val, function(x) { # transforma la taula de manera que se'm queda per cada part
       part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE) # el valor de la variable V1 com var1
@@ -537,8 +554,14 @@ if(candiag[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
     }))
   }, by = 1:nrow(morfo)][, .(var1, var2, var3)] # ens crea la variable nrow que no ens fa falta però és necessari crear-la per separar la taula
   
-  live <- merge(live, ibd[, .(locatum = var1, morfotum = var2, tipustum = var3, ibd = 1)], 
+  live <- merge(live, d_ibd[, .(locatum = var1, morfotum = var2, tipustum = var3, ibd = 1)], 
                 by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
+  
+  # 28/4/26: incloem correccions per la variable basis_diag1 (defcancer1 per a nosaltres)
+  live[!is.na(ibd) & locatum == 'C220' & morfotum %in% d_ibd[var1 == 'C220']$var2 & tipustum == 3 & 
+         defcancer1 %in% c(53,54,56,60), ibd := 0]
+  live[!is.na(ibd) & locatum == 'C221' & morfotum %in% d_ibd[var1 == 'C221']$var2 & tipustum == 3 & 
+         defcancer1 %in% c(53,54,56,60), ibd := 0]
   
   # vesícula biliar i conducte biliar
   cat <- dicc_can[wg_abbrev == 'Live' & subcategory == 'GBT - Gallbladder and biliary tract']$definition
@@ -552,7 +575,7 @@ if(candiag[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
   morfo[, V1 := gsub("'", '', V1)]
   morfo[, V2 := gsub("\\('", '', gsub("'\\)", '', gsub("','", '|', V2, fixed = T)))]
   
-  gbt <- morfo[, {
+  d_gbt <- morfo[, {
     val <- unlist(strsplit(V2, "\\|")) # extrau els valors de cada part de la variable V2
     rbindlist(lapply(val, function(x) { # transforma la taula de manera que se'm queda per cada part
       part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE) # el valor de la variable V1 com var1
@@ -560,9 +583,21 @@ if(candiag[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
     }))
   }, by = 1:nrow(morfo)][, .(var1, var2, var3)] # ens crea la variable nrow que no ens fa falta però és necessari crear-la per separar la taula
   
-  live <- merge(live, gbt[, .(locatum = var1, morfotum = var2, tipustum = var3, gbt = 1)], 
+  live <- merge(live, d_gbt[, .(locatum = var1, morfotum = var2, tipustum = var3, gbt = 1)], 
                 by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
   
+  # 28/4/26: incloem correccions per la variable basis_diag1 (defcancer1 per a nosaltres)
+  live[!is.na(gbt) & locatum == 'C221' & morfotum %in% d_gbt[var1 == 'C221']$var2 & tipustum == 3 & 
+         defcancer1 %in% c(53,54,56,60), gbt := 0]
+  live[!is.na(gbt) & locatum == 'C239' & morfotum %in% 8000 & tipustum == 3 & 
+         defcancer1 %in% c(27,53,54,56,60), gbt := 0]
+  live[!is.na(gbt) & locatum == 'C239' & morfotum %in% d_gbt[var1 == 'C239' & var2 != 8000]$var2 & tipustum == 3 & 
+         defcancer1 %in% c(53,54,56,60), gbt := 0]
+  live[!is.na(gbt) & locatum == 'C240' & morfotum %in% d_gbt[var1 == 'C240']$var2 & tipustum == 3 & 
+         defcancer1 %in% c(53,54,56,60), gbt := 0]
+  live[!is.na(gbt) & locatum == 'C248' & morfotum %in% d_gbt[var1 == 'C248']$var2 & tipustum == 3 & 
+         defcancer1 %in% c(53,54,56,60), gbt := 0]
+
   # conducte biliar extrahepàtic
   cat <- dicc_can[wg_abbrev == 'Live' & subcategory == 'EBD - Extra-hepatic bile duct']$definition
   cat <- gsub(' and Basis_diag1 not in (.,53,54,56,60)', '', cat, fixed = T)
@@ -574,7 +609,7 @@ if(candiag[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
   morfo[, V1 := gsub("'", '', V1)]
   morfo[, V2 := gsub("\\('", '', gsub("'\\)", '', gsub("','", '|', V2, fixed = T)))]
   
-  ebd <- morfo[, {
+  d_ebd <- morfo[, {
     val <- unlist(strsplit(V2, "\\|")) # extrau els valors de cada part de la variable V2
     rbindlist(lapply(val, function(x) { # transforma la taula de manera que se'm queda per cada part
       part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE) # el valor de la variable V1 com var1
@@ -582,8 +617,12 @@ if(candiag[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
     }))
   }, by = 1:nrow(morfo)][, .(var1, var2, var3)] # ens crea la variable nrow que no ens fa falta però és necessari crear-la per separar la taula
   
-  live <- merge(live, ebd[, .(locatum = var1, morfotum = var2, tipustum = var3, ebd = 1)], 
+  live <- merge(live, d_ebd[, .(locatum = var1, morfotum = var2, tipustum = var3, ebd = 1)], 
                 by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
+  
+  # 28/4/26: incloem correccions per la variable basis_diag1 (defcancer1 per a nosaltres)
+  live[!is.na(ebd) & locatum == 'C240' & morfotum %in% d_ebd[var1 == 'C240']$var2 & tipustum == 3 & 
+         defcancer1 %in% c(53,54,56,60), ebd := 0]
   
   # vesícula biliar
   cat <- dicc_can[wg_abbrev == 'Live' & subcategory == 'Gallblad- Gall bladder']$definition
@@ -597,7 +636,7 @@ if(candiag[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
   morfo[, V1 := gsub("'", '', V1)]
   morfo[, V2 := gsub("\\('", '', gsub("'\\)", '', gsub("','", '|', V2, fixed = T)))]
   
-  gallblad <- morfo[, {
+  d_gallblad <- morfo[, {
     val <- unlist(strsplit(V2, "\\|")) # extrau els valors de cada part de la variable V2
     rbindlist(lapply(val, function(x) { # transforma la taula de manera que se'm queda per cada part
       part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE) # el valor de la variable V1 com var1
@@ -605,8 +644,14 @@ if(candiag[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
     }))
   }, by = 1:nrow(morfo)][, .(var1, var2, var3)] # ens crea la variable nrow que no ens fa falta però és necessari crear-la per separar la taula
   
-  live <- merge(live, gallblad[, .(locatum = var1, morfotum = var2, tipustum = var3, gallblad = 1)], 
+  live <- merge(live, d_gallblad[, .(locatum = var1, morfotum = var2, tipustum = var3, gallblad = 1)], 
                 by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
+  
+  # 28/4/26: incloem correccions per la variable basis_diag1 (defcancer1 per a nosaltres)
+  live[!is.na(gallblad) & locatum == 'C239' & morfotum %in% 8000 & tipustum == 3 & 
+         defcancer1 %in% c(27,53,54,56,60), gallblad := 0]
+  live[!is.na(gallblad) & locatum == 'C239' & morfotum %in% d_gallblad[var1 == 'C239' & var2 != 8000]$var2 & tipustum == 3 & 
+         defcancer1 %in% c(53,54,56,60), gallblad := 0]
   
   # ampolla de vater
   cat <- dicc_can[wg_abbrev == 'Live' & subcategory == 'AOV- Ampulla of Vater']$definition
@@ -619,7 +664,7 @@ if(candiag[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
   morfo[, V1 := gsub("'", '', V1)]
   morfo[, V2 := gsub("\\('", '', gsub("'\\)", '', gsub("','", '|', V2, fixed = T)))]
   
-  aov <- morfo[, {
+  d_aov <- morfo[, {
     val <- unlist(strsplit(V2, "\\|")) # extrau els valors de cada part de la variable V2
     rbindlist(lapply(val, function(x) { # transforma la taula de manera que se'm queda per cada part
       part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE) # el valor de la variable V1 com var1
@@ -627,8 +672,12 @@ if(candiag[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
     }))
   }, by = 1:nrow(morfo)][, .(var1, var2, var3)] # ens crea la variable nrow que no ens fa falta però és necessari crear-la per separar la taula
   
-  live <- merge(live, aov[, .(locatum = var1, morfotum = var2, tipustum = var3, aov = 1)], 
+  live <- merge(live, d_aov[, .(locatum = var1, morfotum = var2, tipustum = var3, aov = 1)], 
                 by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
+  
+  # 28/4/26: incloem correccions per la variable basis_diag1 (defcancer1 per a nosaltres)
+  live[!is.na(aov) & locatum == 'C241' & morfotum %in% d_aov[var1 == 'C241']$var2 & tipustum == 3 & 
+         defcancer1 %in% c(53,54,56,60), aov := 0]
   
   # colangiocarcinoma intrahepàtic
   cat <- dicc_can[wg_abbrev == 'Live' & subcategory == 'CCA - Intra-hepatic cholangiocarcinomas']$definition
@@ -641,7 +690,7 @@ if(candiag[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
   morfo[, V1 := gsub("'", '', V1)]
   morfo[, V2 := gsub("\\('", '', gsub("'\\)", '', gsub("','", '|', V2, fixed = T)))]
   
-  cca <- morfo[, {
+  d_cca <- morfo[, {
     val <- unlist(strsplit(V2, "\\|")) # extrau els valors de cada part de la variable V2
     rbindlist(lapply(val, function(x) { # transforma la taula de manera que se'm queda per cada part
       part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE) # el valor de la variable V1 com var1
@@ -649,8 +698,14 @@ if(candiag[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
     }))
   }, by = 1:nrow(morfo)][, .(var1, var2, var3)] # ens crea la variable nrow que no ens fa falta però és necessari crear-la per separar la taula
   
-  live <- merge(live, cca[, .(locatum = var1, morfotum = var2, tipustum = var3, cca = 1)], 
+  live <- merge(live, d_cca[, .(locatum = var1, morfotum = var2, tipustum = var3, cca = 1)], 
                 by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
+  
+  # 28/4/26: incloem correccions per la variable basis_diag1 (defcancer1 per a nosaltres)
+  live[!is.na(cca) & locatum == 'C220' & morfotum %in% d_cca[var1 == 'C220']$var2 & tipustum == 3 & 
+         defcancer1 %in% c(53,54,56,60), cca := 0]
+  live[!is.na(cca) & locatum == 'C221' & morfotum %in% d_cca[var1 == 'C221']$var2 & tipustum == 3 & 
+         defcancer1 %in% c(53,54,56,60), cca := 0]
   
   # colangiocarcinomas extrahepàtic
   cat <- dicc_can[wg_abbrev == 'Live' & subcategory == 'CCA - Extrahepatic cholangiocarcinomas']$definition
@@ -664,7 +719,7 @@ if(candiag[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
   morfo[, V1 := gsub("'", '', V1)]
   morfo[, V2 := gsub("\\('", '', gsub("'\\)", '', gsub("','", '|', V2, fixed = T)))]
   
-  cca_ex <- morfo[, {
+  d_cca_ex <- morfo[, {
     val <- unlist(strsplit(V2, "\\|")) # extrau els valors de cada part de la variable V2
     rbindlist(lapply(val, function(x) { # transforma la taula de manera que se'm queda per cada part
       part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE) # el valor de la variable V1 com var1
@@ -672,8 +727,20 @@ if(candiag[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
     }))
   }, by = 1:nrow(morfo)][, .(var1, var2, var3)] # ens crea la variable nrow que no ens fa falta però és necessari crear-la per separar la taula
   
-  live <- merge(live, cca_ex[, .(locatum = var1, morfotum = var2, tipustum = var3, cca_ex = 1)], 
+  live <- merge(live, d_cca_ex[, .(locatum = var1, morfotum = var2, tipustum = var3, cca_ex = 1)], 
                 by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
+  
+  # 28/4/26: incloem correccions per la variable basis_diag1 (defcancer1 per a nosaltres)
+  live[!is.na(cca_ex) & locatum == 'C221' & morfotum %in% d_cca_ex[var1 == 'C221'] & tipustum == 3 & 
+         defcancer1 %in% c(53,54,56,60), cca_ex := 0]
+  live[!is.na(cca_ex) & locatum == 'C239' & morfotum %in% d_cca_ex[var1 == 'C239'] & tipustum == 3 & 
+         defcancer1 %in% c(27,53,54,56,60), cca_ex := 0]
+  live[!is.na(cca_ex) & locatum == 'C240' & morfotum %in% d_cca_ex[var1 == 'C240'] & tipustum == 3 & 
+         defcancer1 %in% c(53,54,56,60), cca_ex := 0]
+  live[!is.na(cca_ex) & locatum == 'C248' & morfotum %in% d_cca_ex[var1 == 'C248'] & tipustum == 3 & 
+         defcancer1 %in% c(53,54,56,60), cca_ex := 0]
+  live[!is.na(cca_ex) & locatum == 'C249' & morfotum %in% d_cca_ex[var1 == 'C249'] & tipustum == 3 & 
+         defcancer1 %in% c(53,54,56,60), cca_ex := 0]
   
   # colangiocarcinomas extrahepàtic perihilar
   cat <- dicc_can[wg_abbrev == 'Live' & subcategory == 'Perihilar extrahepatic cholangiocarcinomas']$definition
@@ -686,7 +753,7 @@ if(candiag[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
   morfo[, V1 := gsub("'", '', V1)]
   morfo[, V2 := gsub("\\('", '', gsub("'\\)", '', gsub("','", '|', V2, fixed = T)))]
   
-  pec <- morfo[, {
+  d_pec <- morfo[, {
     val <- unlist(strsplit(V2, "\\|")) # extrau els valors de cada part de la variable V2
     rbindlist(lapply(val, function(x) { # transforma la taula de manera que se'm queda per cada part
       part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE) # el valor de la variable V1 com var1
@@ -694,8 +761,16 @@ if(candiag[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
     }))
   }, by = 1:nrow(morfo)][, .(var1, var2, var3)] # ens crea la variable nrow que no ens fa falta però és necessari crear-la per separar la taula
   
-  live <- merge(live, pec[, .(locatum = var1, morfotum = var2, tipustum = var3, pec = 1)], 
+  live <- merge(live, d_pec[, .(locatum = var1, morfotum = var2, tipustum = var3, pec = 1)], 
                 by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
+  
+  # 28/4/26: incloem correccions per la variable basis_diag1 (defcancer1 per a nosaltres)
+  live[!is.na(pec) & locatum == 'C221' & morfotum %in% d_pec[var1 == 'C221']$var2 & tipustum == 3 & 
+         defcancer1 %in% c(53,54,56,60), pec := 0]
+  live[!is.na(pec) & locatum == 'C240' & morfotum %in% d_pec[var1 == 'C240']$var2 & tipustum == 3 & 
+         defcancer1 %in% c(53,54,56,60), pec := 0]
+  live[!is.na(pec) & locatum == 'C249' & morfotum %in% d_pec[var1 == 'C249']$var2 & tipustum == 3 & 
+         defcancer1 %in% c(53,54,56,60), pec := 0]
   
   # colangiocarcinomas extrahepàtic distal
   cat <- dicc_can[wg_abbrev == 'Live' & subcategory == 'Distal extrahepatic cholangiocarcinomas ']$definition
@@ -708,7 +783,7 @@ if(candiag[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
   morfo[, V1 := gsub("'", '', V1)]
   morfo[, V2 := gsub("\\('", '', gsub("'\\)", '', gsub("','", '|', V2, fixed = T)))]
   
-  dec <- morfo[, {
+  d_dec <- morfo[, {
     val <- unlist(strsplit(V2, "\\|")) # extrau els valors de cada part de la variable V2
     rbindlist(lapply(val, function(x) { # transforma la taula de manera que se'm queda per cada part
       part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE) # el valor de la variable V1 com var1
@@ -716,8 +791,18 @@ if(candiag[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
     }))
   }, by = 1:nrow(morfo)][, .(var1, var2, var3)] # ens crea la variable nrow que no ens fa falta però és necessari crear-la per separar la taula
   
-  live <- merge(live, dec[, .(locatum = var1, morfotum = var2, tipustum = var3, dec = 1)], 
+  live <- merge(live, d_dec[, .(locatum = var1, morfotum = var2, tipustum = var3, dec = 1)], 
                 by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
+  
+  # 28/4/26: incloem correccions per la variable basis_diag1 (defcancer1 per a nosaltres)
+  live[!is.na(dec) & locatum == 'C239' & morfotum %in% d_dec[var1 == 'C239'] & tipustum == 3 & 
+         defcancer1 %in% c(53,54,56,60), dec := 0]
+  live[!is.na(dec) & locatum == 'C240' & morfotum %in% d_dec[var1 == 'C240'] & tipustum == 3 & 
+         defcancer1 %in% c(53,54,56,60), dec := 0]
+  live[!is.na(dec) & locatum == 'C248' & morfotum %in% d_dec[var1 == 'C248'] & tipustum == 3 & 
+         defcancer1 %in% c(53,54,56,60), dec := 0]
+  live[!is.na(dec) & locatum == 'C249' & morfotum %in% d_dec[var1 == 'C249'] & tipustum == 3 & 
+         defcancer1 %in% c(53,54,56,60), dec := 0]
   
   # morfologia missing
   live[, morpho_mis := ifelse(is.na(morfotum), 1, NA)]
@@ -746,6 +831,7 @@ if(candiag[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
   candiag[!is.na(subcateg_cor), subcateg := subcateg_cor]
   candiag[!is.na(inc_excl_cor), inc_excl := inc_excl_cor]
   candiag[, c('clas_iarc_cor', 'subcateg_cor', 'inc_excl_cor') := NULL]
+  rm(list = ls(pattern = 'd_'))
 }
 
 # ho repetim a la taula canpreva
@@ -1620,7 +1706,10 @@ if(candiag[grepl('^C73', locatum, ignore.case = T),.N] > 0){
   cat <- gsub(',', ' ', cat, fixed = T)
   
   morfo <- unlist(strsplit(cat, split = ' ', fixed = T))
+  
+  # 28/4/26: segons la descripció, deuria ser des del 8020 fins al 8035 ambdós inclosos i la resta
   morfo <- as.numeric(morfo[!is.na(as.numeric(morfo))])
+  morfo <- c(morfo[1]:morfo[2], morfo[!c(1:2)])
   
   thyr[morfotum %in% morfo, anaplas := 1]
   
@@ -1821,7 +1910,7 @@ if(canpreva[grepl('^C50', locatum, ignore.case = T),.N] > 0){
   morfo <- unlist(strsplit(cat, split = ',', fixed = T))
   morfo <- as.data.table(do.call(rbind, strsplit(morfo, split = '/', fixed = T)))
   
-  brea <- merge(brea, morfo[, .(morfotum = V1, tipustum = V2, epitelial = 1)], 
+  brea <- merge(brea, morfo[, .(morfotum = as.numeric(V1), tipustum = as.numeric(V2), epitelial = 1)], 
                 by = c('morfotum', 'tipustum'), all.x = T)
   
   # in situ
@@ -1831,7 +1920,7 @@ if(canpreva[grepl('^C50', locatum, ignore.case = T),.N] > 0){
   morfo <- unlist(strsplit(cat, split = ',', fixed = T))
   morfo <- as.data.table(do.call(rbind, strsplit(morfo, split = '/', fixed = T)))
   
-  brea <- merge(brea, morfo[, .(morfotum = V1, tipustum = V2, insitu = 1)], 
+  brea <- merge(brea, morfo[, .(morfotum = as.numeric(V1), tipustum = as.numeric(V2), insitu = 1)], 
                 by = c('morfotum', 'tipustum'), all.x = T)
   
   # ineligible
@@ -1841,7 +1930,7 @@ if(canpreva[grepl('^C50', locatum, ignore.case = T),.N] > 0){
   morfo <- unlist(strsplit(cat, split = ',', fixed = T))
   morfo <- as.data.table(do.call(rbind, strsplit(morfo, split = '/', fixed = T)))
   
-  brea <- merge(brea, morfo[, .(morfotum = V1, tipustum = V2, inelig = 1)], 
+  brea <- merge(brea, morfo[, .(morfotum = as.numeric(V1), tipustum = as.numeric(V2), inelig = 1)], 
                 by = c('morfotum', 'tipustum'), all.x = T)
   
   # exclosos
@@ -1851,7 +1940,7 @@ if(canpreva[grepl('^C50', locatum, ignore.case = T),.N] > 0){
   morfo <- unlist(strsplit(cat, split = ',', fixed = T))
   morfo <- as.data.table(do.call(rbind, strsplit(morfo, split = '/', fixed = T)))
   
-  brea <- merge(brea, morfo[, .(morfotum = V1, tipustum = V2, exclos = 1)], 
+  brea <- merge(brea, morfo[, .(morfotum = as.numeric(V1), tipustum = as.numeric(V2), exclos = 1)], 
                 by = c('morfotum', 'tipustum'), all.x = T)
   
   # mama missing
@@ -1966,7 +2055,7 @@ if(canpreva[grepl('^C54', locatum, ignore.case = T),.N] > 0){
   morfo <- unlist(strsplit(cat, split = ',', fixed = T))
   morfo <- as.data.table(do.call(rbind, strsplit(morfo, split = '/', fixed = T)))
   
-  coru <- merge(coru, morfo[, .(morfotum = V1, tipustum = V2, endom = 1)], 
+  coru <- merge(coru, morfo[, .(morfotum = as.numeric(V1), tipustum = as.numeric(V2), endom = 1)], 
                 by = c('morfotum', 'tipustum'), all.x = T)
   
   # tumor cèl·lules seroses
@@ -1976,7 +2065,7 @@ if(canpreva[grepl('^C54', locatum, ignore.case = T),.N] > 0){
   morfo <- unlist(strsplit(cat, split = ',', fixed = T))
   morfo <- as.data.table(do.call(rbind, strsplit(morfo, split = '/', fixed = T)))
   
-  coru <- merge(coru, morfo[, .(morfotum = V1, tipustum = V2, serosa = 1)], 
+  coru <- merge(coru, morfo[, .(morfotum = as.numeric(V1), tipustum = as.numeric(V2), serosa = 1)], 
                 by = c('morfotum', 'tipustum'), all.x = T)
   
   # altres
@@ -1986,7 +2075,7 @@ if(canpreva[grepl('^C54', locatum, ignore.case = T),.N] > 0){
   morfo <- unlist(strsplit(cat, split = ',', fixed = T))
   morfo <- as.data.table(do.call(rbind, strsplit(morfo, split = '/', fixed = T)))
   
-  coru <- merge(coru, morfo[, .(morfotum = V1, tipustum = V2, altres = 1)], 
+  coru <- merge(coru, morfo[, .(morfotum = as.numeric(V1), tipustum = as.numeric(V2), altres = 1)], 
                 by = c('morfotum', 'tipustum'), all.x = T)
   
   # exclosos
@@ -1996,7 +2085,7 @@ if(canpreva[grepl('^C54', locatum, ignore.case = T),.N] > 0){
   morfo <- unlist(strsplit(cat, split = ',', fixed = T))
   morfo <- as.data.table(do.call(rbind, strsplit(morfo, split = '/', fixed = T)))
   
-  coru <- merge(coru, morfo[, .(morfotum = V1, tipustum = V2, exclosos = 1)], 
+  coru <- merge(coru, morfo[, .(morfotum = as.numeric(V1), tipustum = as.numeric(V2), exclosos = 1)], 
                 by = c('morfotum', 'tipustum'), all.x = T)
   
   # corpus missing
@@ -2021,13 +2110,562 @@ if(canpreva[grepl('^C54', locatum, ignore.case = T),.N] > 0){
   canpreva[, c('clas_iarc_cor', 'subcateg_cor', 'inc_excl_cor') := NULL]
 }
 
+rm(coru, cat, morfo)
 
 #### ovari ####
+# treballem primer amb la taula candiag
+if(candiag[grepl('^C56|^C48|^C570', locatum, ignore.case = T),.N] > 0){
+  # per aquest començarem a incorporar les subcategories i inclusions/exclusions
+  ovar <- copy(candiag[grepl('^C56|^C48|^C570', locatum, ignore.case = T), 
+                       .(id, datadiag, locatum, cie10 = substr(locatum, 1, 3), morfotum, tipustum, clas_iarc = 'Ovar')])
+  
+  # tumors serosos
+  cat <- dicc_can[wg_abbrev == 'Ovar' & subcategory == '01-Serous tumours']$definition
+  cat <- gsub('Site ', '', gsub('site ', '', cat, fixed = T), fixed = T)
+  cat <- gsub(' + ', '|', gsub("'", '', cat, fixed = T), fixed = T)
+  
+  morfo <- as.data.table(do.call(rbind, strsplit(cat, split = '|', fixed = T)))
+
+  morfo <- morfo[, {
+    val <- unlist(strsplit(V2, ",")) 
+    rbindlist(lapply(val, function(x) { 
+      part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE) 
+      data.table(var1 = trimws(V1, which = 'both'), var2 = as.character(part[[1]]), var3 = as.character(part[[2]]))
+    }))
+  }, by = 1:nrow(morfo)][, .(var1, var2, var3)]
+  
+  ovar <- merge(ovar, morfo[, .(locatum = var1, morfotum = var2, tipustum = var3, serous = 1)], 
+                by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
+  
+  # tumor mucinós
+  cat <- dicc_can[wg_abbrev == 'Ovar' & subcategory == '02-Mucinous tumours']$definition
+  cat <- gsub('Site ', '', gsub('site ', '', cat, fixed = T), fixed = T)
+  cat <- gsub(' + ', '|', gsub("'", '', cat, fixed = T), fixed = T)
+  
+  morfo <- as.data.table(do.call(rbind, strsplit(cat, split = '|', fixed = T)))
+  
+  morfo <- morfo[, {
+    val <- unlist(strsplit(V2, ",")) 
+    rbindlist(lapply(val, function(x) { 
+      part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE) 
+      data.table(var1 = trimws(V1, which = 'both'), var2 = as.character(part[[1]]), 
+                 var3 = trimws(as.character(part[[2]]), which = 'both'))
+    }))
+  }, by = 1:nrow(morfo)][, .(var1, var2, var3)]
+  
+  ovar <- merge(ovar, morfo[, .(locatum = var1, morfotum = var2, tipustum = var3, mucinous = 1)], 
+                by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
+  
+  # tumor endometrioide
+  cat <- dicc_can[wg_abbrev == 'Ovar' & subcategory == '03-Endometrioid tumours']$definition
+  cat <- gsub('Site ', '', gsub('site ', '', cat, fixed = T), fixed = T)
+  cat <- gsub(' + ', '|', gsub("'", '', cat, fixed = T), fixed = T)
+  
+  morfo <- as.data.table(do.call(rbind, strsplit(cat, split = '|', fixed = T)))
+  
+  morfo <- morfo[, {
+    val <- unlist(strsplit(V2, ",")) 
+    rbindlist(lapply(val, function(x) { 
+      part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE) 
+      data.table(var1 = trimws(V1, which = 'both'), var2 = as.character(part[[1]]), 
+                 var3 = trimws(as.character(part[[2]]), which = 'both'))
+    }))
+  }, by = 1:nrow(morfo)][, .(var1, var2, var3)]
+  
+  ovar <- merge(ovar, morfo[, .(locatum = var1, morfotum = var2, tipustum = var3, endomet = 1)], 
+                by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
+  
+  # tumor cèl·lules clares
+  cat <- dicc_can[wg_abbrev == 'Ovar' & subcategory == '04-Clear cell tumours']$definition
+  cat <- gsub('Site ', '', gsub('site ', '', cat, fixed = T), fixed = T)
+  cat <- gsub(' + ', '|', gsub("'", '', cat, fixed = T), fixed = T)
+  
+  morfo <- as.data.table(do.call(rbind, strsplit(cat, split = '|', fixed = T)))
+  
+  morfo <- morfo[, {
+    val <- unlist(strsplit(V2, ",")) 
+    rbindlist(lapply(val, function(x) { 
+      part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE) 
+      data.table(var1 = trimws(V1, which = 'both'), var2 = as.character(part[[1]]), 
+                 var3 = trimws(as.character(part[[2]]), which = 'both'))
+    }))
+  }, by = 1:nrow(morfo)][, .(var1, var2, var3)]
+  
+  # 28/4/26: hem de traure el codi corresponent a C48 + 'xxxx/x' perquè d'acord amb el codi de la iarc
+  # correspon al grup anterior
+  
+  morfo <- morfo[!(var1 == 'C48' & var2 == 'xxxx' & var3 == 'x')]
+  
+  ovar <- merge(ovar, morfo[, .(locatum = var1, morfotum = var2, tipustum = var3, clear = 1)], 
+                by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
+  
+  # no especificades enlloc
+  cat <- dicc_can[wg_abbrev == 'Ovar' & subcategory == '05-Not otherwise specified']$definition
+  cat <- gsub('Site ', '', gsub('site ', '', cat, fixed = T), fixed = T)
+  cat <- gsub(' + ', '|', gsub("'", '', cat, fixed = T), fixed = T)
+  
+  morfo <- as.data.table(do.call(rbind, strsplit(cat, split = '|', fixed = T)))
+  
+  morfo <- morfo[, {
+    val <- unlist(strsplit(V2, ",")) 
+    rbindlist(lapply(val, function(x) { 
+      part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE) 
+      data.table(var1 = trimws(V1, which = 'both'), var2 = as.character(part[[1]]), 
+                 var3 = trimws(as.character(part[[2]]), which = 'both'))
+    }))
+  }, by = 1:nrow(morfo)][, .(var1, var2, var3)]
+  
+  ovar <- merge(ovar, morfo[, .(locatum = var1, morfotum = var2, tipustum = var3, altres = 1)], 
+                by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
+  
+  # no classificat
+  cat <- dicc_can[wg_abbrev == 'Ovar' & subcategory == '07-Ovarian unclassified']$definition
+  cat <- gsub('Site ', '', gsub('site ', '', cat, fixed = T), fixed = T)
+  cat <- gsub(' + ', '|', gsub("'", '', cat, fixed = T), fixed = T)
+  
+  morfo <- as.data.table(do.call(rbind, strsplit(cat, split = '|', fixed = T)))
+  
+  morfo <- morfo[, {
+    val <- unlist(strsplit(V2, ",")) 
+    rbindlist(lapply(val, function(x) { 
+      part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE) 
+      data.table(var1 = trimws(V1, which = 'both'), var2 = as.character(part[[1]]), 
+                 var3 = trimws(as.character(part[[2]]), which = 'both'))
+    }))
+  }, by = 1:nrow(morfo)][, .(var1, var2, var3)]
+  
+  ovar <- merge(ovar, morfo[, .(locatum = var1, morfotum = var2, tipustum = var3, noclas = 1)], 
+                by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
+  
+  # exclosos
+  cat <- dicc_can[wg_abbrev == 'Ovar' & subcategory == '09-Ovarian excluded']$definition
+  cat <- gsub('Site ', '', gsub('site ', '', cat, fixed = T), fixed = T)
+  cat <- gsub(' + ', '|', gsub("'", '', cat, fixed = T), fixed = T)
+  cat <- gsub(' +', '|', cat, fixed = T)
+  
+  morfo <- as.data.table(do.call(rbind, strsplit(cat, split = '|', fixed = T)))
+  
+  # 28/4/26: pel tipus de funció, hem d'incorporar un valor fictici (que borrarem després) perquè es pugui executar
+  morfo[, V2 := gsub('/,', '/999,', V2, fixed = T)]
+  
+  morfo <- morfo[, {
+    val <- unlist(strsplit(V2, ",", fixed = T)) 
+    rbindlist(lapply(val, function(x) { 
+      part <- tstrsplit(x, "/", fixed = TRUE, type.convert = F) 
+      data.table(var1 = trimws(V1, which = 'both'), var2 = as.character(part[[1]]), 
+                 var3 = trimws(as.character(part[[2]]), which = 'both'))
+    }))
+  }, by = 1:nrow(morfo)][, .(var1, var2, var3)]
+  morfo[var3 == 999, var3 := NA]
+  
+  ovar <- merge(ovar, morfo[, .(locatum = var1, morfotum = var2, tipustum = var3, exclos = 1)], 
+                by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
+  
+  # ovari missing
+  ovar[, mis := ifelse(is.na(morfotum), 1, NA)]
+  
+  # codifiquem les subcategories
+  ovar[serous == 1, `:=`(subcateg = 'Serous tumours', inc_excl = 'Included')]
+  ovar[mucinous == 1, `:=`(subcateg = 'Mucinous tumours', inc_excl = 'Included')]
+  ovar[endomet == 1, `:=`(subcateg = 'Endometrioid tumours', inc_excl = 'Included')]
+  ovar[clear == 1, `:=`(subcateg = 'Clear cell tumours', inc_excl = 'Included')]
+  ovar[altres == 1, `:=`(subcateg = 'Not otherwise specified', inc_excl = 'Included')]
+  ovar[noclas == 1, `:=`(subcateg = 'Ovarian unclassified', inc_excl = 'Included')]
+  ovar[exclos == 1, `:=`(subcateg = 'Ovarian excluded', inc_excl = 'Excluded')]
+  ovar[mis == 1, `:=`(subcateg = 'Missing', inc_excl = 'Excluded')]
+  
+  # classifiquem els que queden pendents com a no classificables
+  ovar[is.na(subcateg), `:=`(subcateg = 'Not unclassified', inc_excl = 'Doubt')]
+  
+  candiag <- merge(candiag, ovar[, .(id, datadiag, locatum, morfotum, tipustum, clas_iarc_cor = clas_iarc,
+                                     subcateg_cor = subcateg, inc_excl_cor = inc_excl)],
+                   by = c('id', 'datadiag', 'locatum', 'morfotum', 'tipustum'), all.x = T)
+  candiag[!is.na(clas_iarc_cor), clas_iarc := clas_iarc_cor]
+  candiag[!is.na(subcateg_cor), subcateg := subcateg_cor]
+  candiag[!is.na(inc_excl_cor), inc_excl := inc_excl_cor]
+  candiag[, c('clas_iarc_cor', 'subcateg_cor', 'inc_excl_cor') := NULL]
+}
+
+# ho repetim a la taula canpreva
+if(canpreva[grepl('^C56|^C48|^C570', locatum, ignore.case = T),.N] > 0){
+  # per aquest començarem a incorporar les subcategories i inclusions/exclusions
+  ovar <- copy(canpreva[grepl('^C56|^C48|^C570', locatum, ignore.case = T), 
+                       .(id, datadiag, locatum, cie10 = substr(locatum, 1, 3), morfotum, tipustum, clas_iarc = 'Ovar')])
+  
+  # tumors serosos
+  cat <- dicc_can[wg_abbrev == 'Ovar' & subcategory == '01-Serous tumours']$definition
+  cat <- gsub('Site ', '', gsub('site ', '', cat, fixed = T), fixed = T)
+  cat <- gsub(' + ', '|', gsub("'", '', cat, fixed = T), fixed = T)
+  
+  morfo <- as.data.table(do.call(rbind, strsplit(cat, split = '|', fixed = T)))
+  
+  morfo <- morfo[, {
+    val <- unlist(strsplit(V2, ",")) 
+    rbindlist(lapply(val, function(x) { 
+      part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE) 
+      data.table(var1 = trimws(V1, which = 'both'), var2 = as.character(part[[1]]), var3 = as.character(part[[2]]))
+    }))
+  }, by = 1:nrow(morfo)][, .(var1, var2, var3)]
+  
+  ovar <- merge(ovar, morfo[, .(locatum = var1, morfotum = as.numeric(var2), tipustum = as.numeric(var3), serous = 1)], 
+                by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
+  
+  # tumor mucinós
+  cat <- dicc_can[wg_abbrev == 'Ovar' & subcategory == '02-Mucinous tumours']$definition
+  cat <- gsub('Site ', '', gsub('site ', '', cat, fixed = T), fixed = T)
+  cat <- gsub(' + ', '|', gsub("'", '', cat, fixed = T), fixed = T)
+  
+  morfo <- as.data.table(do.call(rbind, strsplit(cat, split = '|', fixed = T)))
+  
+  morfo <- morfo[, {
+    val <- unlist(strsplit(V2, ",")) 
+    rbindlist(lapply(val, function(x) { 
+      part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE) 
+      data.table(var1 = trimws(V1, which = 'both'), var2 = as.character(part[[1]]), 
+                 var3 = trimws(as.character(part[[2]]), which = 'both'))
+    }))
+  }, by = 1:nrow(morfo)][, .(var1, var2, var3)]
+  
+  ovar <- merge(ovar, morfo[, .(locatum = var1, morfotum = as.numeric(var2), tipustum = as.numeric(var3), mucinous = 1)], 
+                by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
+  
+  # tumor endometrioide
+  cat <- dicc_can[wg_abbrev == 'Ovar' & subcategory == '03-Endometrioid tumours']$definition
+  cat <- gsub('Site ', '', gsub('site ', '', cat, fixed = T), fixed = T)
+  cat <- gsub(' + ', '|', gsub("'", '', cat, fixed = T), fixed = T)
+  
+  morfo <- as.data.table(do.call(rbind, strsplit(cat, split = '|', fixed = T)))
+  
+  morfo <- morfo[, {
+    val <- unlist(strsplit(V2, ",")) 
+    rbindlist(lapply(val, function(x) { 
+      part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE) 
+      data.table(var1 = trimws(V1, which = 'both'), var2 = as.character(part[[1]]), 
+                 var3 = trimws(as.character(part[[2]]), which = 'both'))
+    }))
+  }, by = 1:nrow(morfo)][, .(var1, var2, var3)]
+  
+  ovar <- merge(ovar, morfo[!is.na(as.numeric(var2)), .(locatum = var1, morfotum = as.numeric(var2), tipustum = as.numeric(var3), endomet = 1)], 
+                by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
+  
+  # tumor cèl·lules clares
+  cat <- dicc_can[wg_abbrev == 'Ovar' & subcategory == '04-Clear cell tumours']$definition
+  cat <- gsub('Site ', '', gsub('site ', '', cat, fixed = T), fixed = T)
+  cat <- gsub(' + ', '|', gsub("'", '', cat, fixed = T), fixed = T)
+  
+  morfo <- as.data.table(do.call(rbind, strsplit(cat, split = '|', fixed = T)))
+  
+  morfo <- morfo[, {
+    val <- unlist(strsplit(V2, ",")) 
+    rbindlist(lapply(val, function(x) { 
+      part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE) 
+      data.table(var1 = trimws(V1, which = 'both'), var2 = as.character(part[[1]]), 
+                 var3 = trimws(as.character(part[[2]]), which = 'both'))
+    }))
+  }, by = 1:nrow(morfo)][, .(var1, var2, var3)]
+  
+  # 28/4/26: hem de traure el codi corresponent a C48 + 'xxxx/x' perquè d'acord amb el codi de la iarc
+  # correspon al grup anterior
+  
+  morfo <- morfo[!(var1 == 'C48' & var2 == 'xxxx' & var3 == 'x')]
+  
+  ovar <- merge(ovar, morfo[!is.na(as.numeric(var2)), .(locatum = var1, morfotum = as.numeric(var2), tipustum = as.numeric(var3), clear = 1)], 
+                by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
+  
+  # no especificades enlloc
+  cat <- dicc_can[wg_abbrev == 'Ovar' & subcategory == '05-Not otherwise specified']$definition
+  cat <- gsub('Site ', '', gsub('site ', '', cat, fixed = T), fixed = T)
+  cat <- gsub(' + ', '|', gsub("'", '', cat, fixed = T), fixed = T)
+  
+  morfo <- as.data.table(do.call(rbind, strsplit(cat, split = '|', fixed = T)))
+  
+  morfo <- morfo[, {
+    val <- unlist(strsplit(V2, ",")) 
+    rbindlist(lapply(val, function(x) { 
+      part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE) 
+      data.table(var1 = trimws(V1, which = 'both'), var2 = as.character(part[[1]]), 
+                 var3 = trimws(as.character(part[[2]]), which = 'both'))
+    }))
+  }, by = 1:nrow(morfo)][, .(var1, var2, var3)]
+  
+  ovar <- merge(ovar, morfo[, .(locatum = var1, morfotum = as.numeric(var2), tipustum = as.numeric(var3), altres = 1)], 
+                by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
+  
+  # no classificat
+  cat <- dicc_can[wg_abbrev == 'Ovar' & subcategory == '07-Ovarian unclassified']$definition
+  cat <- gsub('Site ', '', gsub('site ', '', cat, fixed = T), fixed = T)
+  cat <- gsub(' + ', '|', gsub("'", '', cat, fixed = T), fixed = T)
+  
+  morfo <- as.data.table(do.call(rbind, strsplit(cat, split = '|', fixed = T)))
+  
+  morfo <- morfo[, {
+    val <- unlist(strsplit(V2, ",")) 
+    rbindlist(lapply(val, function(x) { 
+      part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE) 
+      data.table(var1 = trimws(V1, which = 'both'), var2 = as.character(part[[1]]), 
+                 var3 = trimws(as.character(part[[2]]), which = 'both'))
+    }))
+  }, by = 1:nrow(morfo)][, .(var1, var2, var3)]
+  
+  ovar <- merge(ovar, morfo[, .(locatum = var1, morfotum = as.numeric(var2), tipustum = as.numeric(var3), noclas = 1)], 
+                by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
+  
+  # exclosos
+  cat <- dicc_can[wg_abbrev == 'Ovar' & subcategory == '09-Ovarian excluded']$definition
+  cat <- gsub('Site ', '', gsub('site ', '', cat, fixed = T), fixed = T)
+  cat <- gsub(' + ', '|', gsub("'", '', cat, fixed = T), fixed = T)
+  cat <- gsub(' +', '|', cat, fixed = T)
+  
+  morfo <- as.data.table(do.call(rbind, strsplit(cat, split = '|', fixed = T)))
+  
+  # 28/4/26: pel tipus de funció, hem d'incorporar un valor fictici (que borrarem després) perquè es pugui executar
+  morfo[, V2 := gsub('/,', '/999,', V2, fixed = T)]
+  
+  morfo <- morfo[, {
+    val <- unlist(strsplit(V2, ",", fixed = T)) 
+    rbindlist(lapply(val, function(x) { 
+      part <- tstrsplit(x, "/", fixed = TRUE, type.convert = F) 
+      data.table(var1 = trimws(V1, which = 'both'), var2 = as.character(part[[1]]), 
+                 var3 = trimws(as.character(part[[2]]), which = 'both'))
+    }))
+  }, by = 1:nrow(morfo)][, .(var1, var2, var3)]
+  morfo[var3 == 999, var3 := NA]
+  
+  ovar <- merge(ovar, morfo[, .(locatum = var1, morfotum = as.numeric(var2), tipustum = as.numeric(var3), exclos = 1)], 
+                by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
+  
+  # ovari missing
+  ovar[, mis := ifelse(is.na(morfotum), 1, NA)]
+  
+  # codifiquem les subcategories
+  ovar[serous == 1, `:=`(subcateg = 'Serous tumours', inc_excl = 'Included')]
+  ovar[mucinous == 1, `:=`(subcateg = 'Mucinous tumours', inc_excl = 'Included')]
+  ovar[endomet == 1, `:=`(subcateg = 'Endometrioid tumours', inc_excl = 'Included')]
+  ovar[clear == 1, `:=`(subcateg = 'Clear cell tumours', inc_excl = 'Included')]
+  ovar[altres == 1, `:=`(subcateg = 'Not otherwise specified', inc_excl = 'Included')]
+  ovar[noclas == 1, `:=`(subcateg = 'Ovarian unclassified', inc_excl = 'Included')]
+  ovar[exclos == 1, `:=`(subcateg = 'Ovarian excluded', inc_excl = 'Excluded')]
+  ovar[mis == 1, `:=`(subcateg = 'Missing', inc_excl = 'Excluded')]
+  
+  # classifiquem els que queden pendents com a no classificables
+  ovar[is.na(subcateg), `:=`(subcateg = 'Not unclassified', inc_excl = 'Doubt')]
+  
+  canpreva <- merge(canpreva, ovar[, .(id, datadiag, locatum, morfotum, tipustum, clas_iarc_cor = clas_iarc,
+                                     subcateg_cor = subcateg, inc_excl_cor = inc_excl)],
+                   by = c('id', 'datadiag', 'locatum', 'morfotum', 'tipustum'), all.x = T)
+  canpreva[!is.na(clas_iarc_cor), clas_iarc := clas_iarc_cor]
+  canpreva[!is.na(subcateg_cor), subcateg := subcateg_cor]
+  canpreva[!is.na(inc_excl_cor), inc_excl := inc_excl_cor]
+  canpreva[, c('clas_iarc_cor', 'subcateg_cor', 'inc_excl_cor') := NULL]
+}
+
+rm(ovar, cat, morfo)
 
 
+#### pròstata ####
+# treballem primer amb la taula candiag
+if(candiag[grepl('^C61', locatum, ignore.case = T),.N] > 0){
+  # 28/4/26: per a la pròstata hem de definir primer la variable tnmtype, es defineix com segueix
+  # tnmtype = 2: si tnmclas té T3 o T4 o tnmclas té N1, N2 o N3 o tnmclas té M1
+  # tnmtype = 1: si tnmclas té T0, T1 o T2 o tnmclas té N0 i NX o tnmclas té M0
+  # tnmtype = 9: en altre cas
+  
+  candiag[grepl('T3|T4|N1|N2|N3|M1', tnmclas, ignore.case = T), tnmtype := 2]
+  candiag[grepl('T0|T1|T2|N0|NX|M0', tnmclas, ignore.case = T) & is.na(tnmtype), tnmtype := 1]
+  candiag[is.na(tnmtype), tnmtype := 9]
+  
+  # per aquest començarem a incorporar les subcategories i inclusions/exclusions
+  pros <- copy(candiag[grepl('^C61', locatum, ignore.case = T), 
+                       .(id, datadiag, locatum, tnmtype, ESTADTUM, clas_iarc = 'Pros')])
+  
+  # codifiquem les subcategories
+  # sols podem incorporar 2 dels 3 criteris de codificació degut a què la variable resumestat està buida
+  pros[tnmtype == 2 | (ESTADTUM %in% 3:5 & tnmtype == 9), `:=`(subcateg = 'Advanced', inc_excl = 'Included')]
+  pros[tnmtype == 1 | (ESTADTUM %in% 1:2 & tnmtype == 9), `:=`(subcateg = 'Localised', inc_excl = 'Included')]
+  pros[!((tnmtype == 2 | (ESTADTUM %in% 3:5 & tnmtype == 9)) | (tnmtype == 1 | (ESTADTUM %in% 1:2 & tnmtype == 9))), 
+       `:=`(subcateg = 'Others', inc_excl = 'Included')]
+
+  # classifiquem els que queden pendents com a no classificables
+  pros[is.na(subcateg), `:=`(subcateg = 'Not unclassified', inc_excl = 'Doubt')]
+  
+  candiag <- merge(candiag, pros[, .(id, datadiag, locatum, tnmtype, ESTADTUM, clas_iarc_cor = clas_iarc,
+                                     subcateg_cor = subcateg, inc_excl_cor = inc_excl)],
+                   by = c('id', 'datadiag', 'locatum', 'tnmtype', 'ESTADTUM'), all.x = T)
+  candiag[!is.na(clas_iarc_cor), clas_iarc := clas_iarc_cor]
+  candiag[!is.na(subcateg_cor), subcateg := subcateg_cor]
+  candiag[!is.na(inc_excl_cor), inc_excl := inc_excl_cor]
+  candiag[, c('clas_iarc_cor', 'subcateg_cor', 'inc_excl_cor') := NULL]
+}
+
+# no es pot treballar amb la taula canpreva perquè no tenim informació de variables clau per definir-ho
+
+rm(pros)
 
 
+#### anogenital ####
+candiag[grepl('^C21|^C51|^C52|^C53|^C60', locatum, ignore.case = T), `:=`(clas_iarc = 'Anog', inc_excl = 'Included')]
+canpreva[grepl('^C21|^C51|^C52|^C53|^C60', locatum, ignore.case = T), `:=`(clas_iarc = 'Anog', inc_excl = 'Included')]
 
+
+#### cervell ####
+candiag[grepl('^C70|^C71|^C72', locatum, ignore.case = T), `:=`(clas_iarc = 'Brai', inc_excl = 'Included')]
+canpreva[grepl('^C70|^C71|^C72', locatum, ignore.case = T), `:=`(clas_iarc = 'Brai', inc_excl = 'Included')]
+
+
+#### unknown primary site ####
+candiag[grepl('^C80', locatum, ignore.case = T), `:=`(clas_iarc = 'Cups', inc_excl = 'Included')]
+canpreva[grepl('^C80', locatum, ignore.case = T), `:=`(clas_iarc = 'Cups', inc_excl = 'Included')]
+
+
+#### intestí prim ####
+candiag[grepl('^C17', locatum, ignore.case = T), `:=`(clas_iarc = 'Sint', inc_excl = 'Included')]
+canpreva[grepl('^C17', locatum, ignore.case = T), `:=`(clas_iarc = 'Sint', inc_excl = 'Included')]
+
+
+#### pell/melanoma ####
+# treballem primer amb la taula candiag
+if(candiag[grepl('^C440', locatum, ignore.case = T) | grepl(paste0('^', 872:879, collapse = '|'), morfotum, ignore.case = T),.N] > 0){
+  # per aquest començarem a incorporar les subcategories i inclusions/exclusions
+  skin <- copy(candiag[grepl('^C440', locatum, ignore.case = T) | grepl(paste0('^', 872:879, collapse = '|'), morfotum, ignore.case = T), 
+                       .(id, datadiag, locatum, cie10 = substr(locatum, 1, 3), morfotum, tipustum, clas_iarc = 'Skin')])
+  
+  # carcinoma de cèl·lules escamoses
+  cat <- dicc_can[wg_abbrev == 'Skin' & subcategory == '01-Squamous Cell Carcinoma']$definition
+  cat <- gsub("'", '', cat, fixed = T)
+  
+  morfo <- unlist(strsplit(cat, split = ',', fixed = T))
+
+  skin[grepl(paste0('^', morfo, collapse = '|'), morfotum, ignore.case = T), `:=`(subcateg = 'Squamous Cell Carcinoma', inc_excl = 'Included')]
+  
+  # carcinoma de cèl·lules basals
+  cat <- dicc_can[wg_abbrev == 'Skin' & subcategory == '02-Basal Cell Carcinoma']$definition
+  cat <- gsub("'", '', cat, fixed = T)
+  
+  morfo <- unlist(strsplit(cat, split = ',', fixed = T))
+
+  skin[grepl(paste0('^', morfo, collapse = '|'), morfotum, ignore.case = T), `:=`(subcateg = 'Basal Cell Carcinoma', inc_excl = 'Included')]
+  
+  # melanoma
+  cat <- dicc_can[wg_abbrev == 'Skin' & subcategory == '03-Melanoma']$definition
+  cat <- gsub("'", '', cat, fixed = T)
+  
+  morfo <- unlist(strsplit(cat, split = ',', fixed = T))
+
+  skin[grepl(paste0('^', morfo, collapse = '|'), morfotum, ignore.case = T), `:=`(subcateg = 'Melanoma', inc_excl = 'Included')]
+  
+  # pell no classificats
+  skin[is.na(subcateg) & !is.na(morfotum), `:=`(subcateg = 'Skin unclassified', inc_excl = 'Included')]
+  
+  # pell missing
+  skin[is.na(morfotum), `:=`(subcateg = 'Skin missing', inc_excl = 'Included')]
+  
+  # classifiquem els que queden pendents com a no classificables
+  skin[is.na(subcateg), `:=`(subcateg = 'Not unclassified', inc_excl = 'Doubt')]
+  
+  candiag <- merge(candiag, skin[, .(id, datadiag, locatum, morfotum, tipustum, clas_iarc_cor = clas_iarc,
+                                     subcateg_cor = subcateg, inc_excl_cor = inc_excl)],
+                   by = c('id', 'datadiag', 'locatum', 'morfotum', 'tipustum'), all.x = T)
+  candiag[!is.na(clas_iarc_cor), clas_iarc := clas_iarc_cor]
+  candiag[!is.na(subcateg_cor), subcateg := subcateg_cor]
+  candiag[!is.na(inc_excl_cor), inc_excl := inc_excl_cor]
+  candiag[, c('clas_iarc_cor', 'subcateg_cor', 'inc_excl_cor') := NULL]
+}
+
+# ho repetim a la taula canpreva
+if(canpreva[grepl('^C440', locatum, ignore.case = T) | grepl(paste0('^', 872:879, collapse = '|'), morfotum, ignore.case = T),.N] > 0){
+  # per aquest començarem a incorporar les subcategories i inclusions/exclusions
+  skin <- copy(canpreva[grepl('^C440', locatum, ignore.case = T) | grepl(paste0('^', 872:879, collapse = '|'), morfotum, ignore.case = T), 
+                       .(id, datadiag, locatum, cie10 = substr(locatum, 1, 3), morfotum, tipustum, clas_iarc = 'Skin')])
+  
+  # carcinoma de cèl·lules escamoses
+  cat <- dicc_can[wg_abbrev == 'Skin' & subcategory == '01-Squamous Cell Carcinoma']$definition
+  cat <- gsub("'", '', cat, fixed = T)
+  
+  morfo <- unlist(strsplit(cat, split = ',', fixed = T))
+  
+  skin[grepl(paste0('^', morfo, collapse = '|'), morfotum, ignore.case = T), `:=`(subcateg = 'Squamous Cell Carcinoma', inc_excl = 'Included')]
+  
+  # carcinoma de cèl·lules basals
+  cat <- dicc_can[wg_abbrev == 'Skin' & subcategory == '02-Basal Cell Carcinoma']$definition
+  cat <- gsub("'", '', cat, fixed = T)
+  
+  morfo <- unlist(strsplit(cat, split = ',', fixed = T))
+  
+  skin[grepl(paste0('^', morfo, collapse = '|'), morfotum, ignore.case = T), `:=`(subcateg = 'Basal Cell Carcinoma', inc_excl = 'Included')]
+  
+  # melanoma
+  cat <- dicc_can[wg_abbrev == 'Skin' & subcategory == '03-Melanoma']$definition
+  cat <- gsub("'", '', cat, fixed = T)
+  
+  morfo <- unlist(strsplit(cat, split = ',', fixed = T))
+  
+  skin[grepl(paste0('^', morfo, collapse = '|'), morfotum, ignore.case = T), `:=`(subcateg = 'Melanoma', inc_excl = 'Included')]
+  
+  # pell no classificats
+  skin[is.na(subcateg) & !is.na(morfotum), `:=`(subcateg = 'Skin unclassified', inc_excl = 'Included')]
+  
+  # pell missing
+  skin[is.na(morfotum), `:=`(subcateg = 'Skin missing', inc_excl = 'Included')]
+  
+  # classifiquem els que queden pendents com a no classificables
+  skin[is.na(subcateg), `:=`(subcateg = 'Not unclassified', inc_excl = 'Doubt')]
+  
+  canpreva <- merge(canpreva, skin[, .(id, datadiag, locatum, morfotum, tipustum, clas_iarc_cor = clas_iarc,
+                                     subcateg_cor = subcateg, inc_excl_cor = inc_excl)],
+                   by = c('id', 'datadiag', 'locatum', 'morfotum', 'tipustum'), all.x = T)
+  canpreva[!is.na(clas_iarc_cor), clas_iarc := clas_iarc_cor]
+  canpreva[!is.na(subcateg_cor), subcateg := subcateg_cor]
+  canpreva[!is.na(inc_excl_cor), inc_excl := inc_excl_cor]
+  canpreva[, c('clas_iarc_cor', 'subcateg_cor', 'inc_excl_cor') := NULL]
+}
+
+rm(skin)
+
+
+#### leucèmia ####
+# extraiem la info de les morfologies que necessitarem
+
+cat <- dicc_can[wg_abbrev == 'Leuk']$code
+cat <- gsub("Morphology=", '', cat, fixed = T)
+morfo <- unlist(strsplit(cat, split = ',', fixed = T))
+
+candiag[grepl(paste0('^', morfo, collapse = '|'), morfotum, ignore.case = T), `:=`(clas_iarc = 'Leuk', inc_excl = 'Included')]
+canpreva[grepl(paste0('^', morfo, collapse = '|'), morfotum, ignore.case = T), `:=`(clas_iarc = 'Leuk', inc_excl = 'Included')]
+
+rm(cat, morfo)
+
+
+#### linfoma ####
+# extraiem la info de les morfologies que necessitarem
+
+cat <- dicc_can[wg_abbrev == 'Lymp']$code
+cat <- gsub("Morphology=", '', cat, fixed = T)
+codis <- unlist(strsplit(cat, split = ',', fixed = T))
+
+# treballem primer amb la taula candiag
+if(candiag[grepl(paste0('^', codis, collapse = '|'), morfotum, ignore.case = T),.N] > 0){
+  # per aquest començarem a incorporar les subcategories i inclusions/exclusions
+  skin <- copy(candiag[grepl(paste0('^', codis, collapse = '|'), morfotum, ignore.case = T), 
+                       .(id, datadiag, locatum, morfotum, tipustum, clas_iarc = 'Skin')])
+  
+  # com que tots tenen més o menys la mateixa forma, ho fem en una funció o bucle
+  for(i in 1:dicc_can[wg_abbrev == 'Lymp', .N]){
+    nom <- dicc_can[wg_abbrev == 'Lymp']$subcateg[i]
+                    
+  }
+  
+  
+  
+  lymp[is.na(subcateg), `:=`(subcateg = 'Not unclassified', inc_excl = 'Doubt')]
+  
+  candiag <- merge(candiag, skin[, .(id, datadiag, locatum, morfotum, tipustum, clas_iarc_cor = clas_iarc,
+                                     subcateg_cor = subcateg, inc_excl_cor = inc_excl)],
+                   by = c('id', 'datadiag', 'locatum', 'morfotum', 'tipustum'), all.x = T)
+  candiag[!is.na(clas_iarc_cor), clas_iarc := clas_iarc_cor]
+  candiag[!is.na(subcateg_cor), subcateg := subcateg_cor]
+  candiag[!is.na(inc_excl_cor), inc_excl := inc_excl_cor]
+  candiag[, c('clas_iarc_cor', 'subcateg_cor', 'inc_excl_cor') := NULL]
+}
 
 
 
