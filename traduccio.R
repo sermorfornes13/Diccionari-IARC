@@ -2645,27 +2645,108 @@ codis <- unlist(strsplit(cat, split = ',', fixed = T))
 # treballem primer amb la taula candiag
 if(candiag[grepl(paste0('^', codis, collapse = '|'), morfotum, ignore.case = T),.N] > 0){
   # per aquest començarem a incorporar les subcategories i inclusions/exclusions
-  skin <- copy(candiag[grepl(paste0('^', codis, collapse = '|'), morfotum, ignore.case = T), 
-                       .(id, datadiag, locatum, morfotum, tipustum, clas_iarc = 'Skin')])
+  lymp <- copy(candiag[grepl(paste0('^', codis, collapse = '|'), morfotum, ignore.case = T), 
+                       .(id, datadiag, locatum, morfotum, tipustum, clas_iarc = 'Lymp', 
+                         subcateg, inc_excl)])
+  
+  dicc_can[wg_abbrev == 'Lymp', subcategory := gsub("'- '", '&', subcategory, fixed = T)]
+  dicc_can[wg_abbrev == 'Lymp', subcategory := gsub("' -'", '&', subcategory, fixed = T)]
+  dicc_can[wg_abbrev == 'Lymp', subcategory := gsub("' - '", '&', subcategory, fixed = T)]
   
   # com que tots tenen més o menys la mateixa forma, ho fem en una funció o bucle
-  for(i in 1:dicc_can[wg_abbrev == 'Lymp', .N]){
-    nom <- dicc_can[wg_abbrev == 'Lymp']$subcateg[i]
-                    
+  for(i in 1:(dicc_can[wg_abbrev == 'Lymp', .N]-1)){
+    res <- dicc_can[wg_abbrev == 'Lymp']$subcategory[i]
+    res <- unlist(strsplit(res, split = '&', fixed = T))
+    res <- trimws(gsub("'", '', res[length(res)], fixed = T), which = 'both')
+    if(res == 'Mature T- or NK-NHL')
+      res <- 'NK-NHL'
+    
+    # seleccionem els casos per cadascun dels linfomes
+    cat <- dicc_can[wg_abbrev == 'Lymp']$definition[i]
+    cat <- gsub(' ', '&', gsub(', ', '&', gsub("'", '', cat, fixed = T), fixed = T), fixed = T)
+
+    morfo <- unlist(strsplit(cat, split = '&', fixed = T))
+    morfo <- as.data.table(do.call(rbind, strsplit(morfo, split = '/', fixed = T)))
+
+    lymp <- merge(lymp, morfo[, .(morfotum = V1, tipustum = V2, subcateg_cor = res, inc_excl_cor = 'Included')], 
+                  by = c('morfotum', 'tipustum'), all.x = T)
+    lymp[!is.na(subcateg_cor), subcateg := subcateg_cor]
+    lymp[!is.na(inc_excl_cor), inc_excl := inc_excl_cor]
+    lymp[, c('subcateg_cor', 'inc_excl_cor') := NULL]
   }
   
-  
+  # ajuntem la informació que hem generat 
   
   lymp[is.na(subcateg), `:=`(subcateg = 'Not unclassified', inc_excl = 'Doubt')]
   
-  candiag <- merge(candiag, skin[, .(id, datadiag, locatum, morfotum, tipustum, clas_iarc_cor = clas_iarc,
+  candiag <- merge(candiag, lymp[, .(id, datadiag, locatum, morfotum, tipustum, clas_iarc_cor = clas_iarc,
                                      subcateg_cor = subcateg, inc_excl_cor = inc_excl)],
                    by = c('id', 'datadiag', 'locatum', 'morfotum', 'tipustum'), all.x = T)
   candiag[!is.na(clas_iarc_cor), clas_iarc := clas_iarc_cor]
   candiag[!is.na(subcateg_cor), subcateg := subcateg_cor]
   candiag[!is.na(inc_excl_cor), inc_excl := inc_excl_cor]
   candiag[, c('clas_iarc_cor', 'subcateg_cor', 'inc_excl_cor') := NULL]
+
 }
+
+# ho repetim a la taula canpreva
+if(canpreva[grepl(paste0('^', codis, collapse = '|'), morfotum, ignore.case = T),.N] > 0){
+  # per aquest començarem a incorporar les subcategories i inclusions/exclusions
+  lymp <- copy(canpreva[grepl(paste0('^', codis, collapse = '|'), morfotum, ignore.case = T), 
+                       .(id, datadiag, locatum, morfotum, tipustum, clas_iarc = 'Lymp', 
+                         subcateg, inc_excl)])
+  
+  dicc_can[wg_abbrev == 'Lymp', subcategory := gsub("'- '", '&', subcategory, fixed = T)]
+  dicc_can[wg_abbrev == 'Lymp', subcategory := gsub("' -'", '&', subcategory, fixed = T)]
+  dicc_can[wg_abbrev == 'Lymp', subcategory := gsub("' - '", '&', subcategory, fixed = T)]
+  
+  # com que tots tenen més o menys la mateixa forma, ho fem en una funció o bucle
+  for(i in 1:(dicc_can[wg_abbrev == 'Lymp', .N]-1)){
+    res <- dicc_can[wg_abbrev == 'Lymp']$subcategory[i]
+    res <- unlist(strsplit(res, split = '&', fixed = T))
+    res <- trimws(gsub("'", '', res[length(res)], fixed = T), which = 'both')
+    if(res == 'Mature T- or NK-NHL')
+      res <- 'NK-NHL'
+    
+    # seleccionem els casos per cadascun dels linfomes
+    cat <- dicc_can[wg_abbrev == 'Lymp']$definition[i]
+    cat <- gsub(' ', '&', gsub(', ', '&', gsub("'", '', cat, fixed = T), fixed = T), fixed = T)
+    
+    morfo <- unlist(strsplit(cat, split = '&', fixed = T))
+    morfo <- as.data.table(do.call(rbind, strsplit(morfo, split = '/', fixed = T)))
+    
+    lymp <- merge(lymp, morfo[, .(morfotum = V1, tipustum = V2, subcateg_cor = res, inc_excl_cor = 'Included')], 
+                  by = c('morfotum', 'tipustum'), all.x = T)
+    lymp[!is.na(subcateg_cor), subcateg := subcateg_cor]
+    lymp[!is.na(inc_excl_cor), inc_excl := inc_excl_cor]
+    lymp[, c('subcateg_cor', 'inc_excl_cor') := NULL]
+  }
+  
+  # ajuntem la informació que hem generat 
+  
+  lymp[is.na(subcateg), `:=`(subcateg = 'Not unclassified', inc_excl = 'Doubt')]
+  
+  canpreva <- merge(canpreva, lymp[, .(id, datadiag, locatum, morfotum, tipustum, clas_iarc_cor = clas_iarc,
+                                     subcateg_cor = subcateg, inc_excl_cor = inc_excl)],
+                   by = c('id', 'datadiag', 'locatum', 'morfotum', 'tipustum'), all.x = T)
+  canpreva[!is.na(clas_iarc_cor), clas_iarc := clas_iarc_cor]
+  canpreva[!is.na(subcateg_cor), subcateg := subcateg_cor]
+  canpreva[!is.na(inc_excl_cor), inc_excl := inc_excl_cor]
+  canpreva[, c('clas_iarc_cor', 'subcateg_cor', 'inc_excl_cor') := NULL]
+  
+}
+
+rm(cat, codis, morfo, lymp, res)
+
+
+#### mesotelioma ####
+candiag[grepl('^C384', locatum, ignore.case = T) & grepl('^905', morfotum, ignore.case = T), `:=`(clas_iarc = 'Meso', inc_excl = 'Included')]
+canpreva[grepl('^C384', locatum, ignore.case = T) & grepl('^905', morfotum, ignore.case = T), `:=`(clas_iarc = 'Meso', inc_excl = 'Included')]
+
+
+
+
+
 
 
 
