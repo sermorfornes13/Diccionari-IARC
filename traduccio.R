@@ -312,6 +312,18 @@ if(canpreva[grepl('^C18|^C19|^C20', locatum, ignore.case = T), .N] > 0){
 
 rm(clrt, morfo, cat)
 
+# # comprovem si hi ha algun codi duplicat
+# prova <- dicc_can[wg_abbrev == 'Clrt', definition][1:4]
+# prova <- gsub("'", '', gsub(')', '', prova, fixed = T), fixed = T)
+# prova <- gsub(",", '|', prova, fixed = T)
+# 
+# morfo <- unlist(strsplit(prova, split = '|', fixed = T))
+# morfo <- as.data.table(do.call(rbind, strsplit(morfo, split = '/', fixed = T)))
+# morfo[V1 == V2, V2 := NA]
+# 
+# morfo[,.N] == unique(morfo)[,.N] # són iguals
+# rm(morfo, prova)
+
 
 #### ronyó #### 
 # treballem primer amb la taula candiag
@@ -459,6 +471,19 @@ if(canpreva[grepl('^C64|^C65', locatum, ignore.case = T), .N] > 0){
 }
 
 rm(kidn, morfo, cat)
+
+# # comprovem si hi ha algun codi duplicat
+# prova <- dicc_can[wg_abbrev == 'Kidn', definition][1:3]
+# prova <- gsub("'", '', gsub(')', '', prova, fixed = T), fixed = T)
+# prova <- gsub(",", '|', prova, fixed = T)
+# prova <- gsub("  or site in C65", '', prova, fixed = T)
+# 
+# morfo <- unlist(strsplit(prova, split = '|', fixed = T))
+# morfo <- as.data.table(do.call(rbind, strsplit(morfo, split = '/', fixed = T)))
+# morfo[V1 == V2, V2 := NA]
+# 
+# morfo[,.N] == unique(morfo)[,.N] # són iguals
+# rm(morfo, prova)
 
 
 #### fetge #### 
@@ -1124,6 +1149,43 @@ if(canpreva[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
 
 rm(live, aov, cat, cca, cca_ex, dec, ebd, gallblad, gbt, hcc, hcc_w, ibd, morfo, pec, vars_to_modif)
 
+# # comprovem si hi ha algun codi duplicat
+# prova <- dicc_can[wg_abbrev == 'Live', definition][1:11]
+# prova <- gsub(' and Basis_diag1 not in (.,53,54,56,60)', '', prova, fixed = T)
+# prova <- gsub(' and Basis_diag1 not in (.,27,53,54,56,60)', '', prova, fixed = T)
+# prova <- gsub('Site eq ', '', gsub('and Morpho in', '&', prova))
+# prova <- gsub(' or ', '|', gsub('\n', '', prova))
+# prova <- gsub(' or', '|', prova)
+# prova <- gsub('as above + ', '', prova, fixed = T)
+# prova <- gsub('If ', '', prova, fixed = T)
+# prova <- gsub(' and Lab_Afp* ge 12', '', prova, fixed = T)
+# prova <- gsub(' and Basis_diag1 not in (.,53,54,56,60)', '', prova, fixed = T)
+# prova <- gsub(' and Basis_diag1 in (20,25,50,55,70)', '', prova, fixed = T)
+# 
+# morfo <- unlist(strsplit(prova, split = '|', fixed = T))
+# morfo <- as.data.table(do.call(rbind, strsplit(morfo, split = '&', fixed = T)))
+# morfo[, V1 := gsub("'", '', V1)]
+# morfo[, V2 := gsub("\\('", '', gsub("'\\)", '', gsub("','", '|', V2, fixed = T)))]
+# morfo[, V2 := trimws(V2, which = 'both')]
+# morfo[, clase := c(rep('HCC', 2), rep('HCC_Wide', 2), rep('IBD', 2), rep('GBT', 5), 'EBD',
+#                    rep('Gallblad', 2), 'AOV', rep('CCA', 2), rep('CCA_ex', 5), rep('PEC', 3),
+#                    rep('DEC',4))]
+# 
+# morfo <- morfo[, {
+#   val <- unlist(strsplit(V2, "\\|"))
+#   rbindlist(lapply(val, function(x) {
+#     part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE)
+#     data.table(var1 = trimws(V1, which = 'both'), var2 = as.character(part[[1]]), var3 = as.character(part[[2]]), clase)
+#   }))
+# }, by = 1:nrow(morfo)][, .(var1, var2, var3, clase)]
+# morfo <- unique(morfo)
+# 
+# morfo[,.N, .(var1, var2, var3)][N>1] # hi ha repetits
+# morfo <- merge(morfo, morfo[,.N, .(var1, var2, var3)][N>1][, .(var1, var2, var3, rep = 1)], by = paste0('var', 1:3), all.x = T)
+# morfo[rep == 1]
+# 
+# rm(morfo, prova)
+
 
 #### pulmó #### 
 candiag[grepl('^C34', locatum, ignore.case = T), `:=`(clas_iarc = 'Lung', inc_excl = 'Included')]
@@ -1518,15 +1580,39 @@ if(canpreva[grepl('^C15|^C16', locatum, ignore.case = T),.N] > 0){
 
 rm(stom, cat, morfo)
 
+# # comprovem si hi ha algun codi duplicat
+# prova <- dicc_can[wg_abbrev == 'Stom']$definition[1:13]
+# prova <- gsub('Site ', '', gsub('+ ', ' & ', prova, fixed = T), fixed = T)
+# prova <- gsub("'", '', prova)
+# 
+# morfo <- as.data.table(do.call(rbind, strsplit(prova, split = '&', fixed = T)))
+# morfo[, V1 := trimws(gsub("'", '', V1), which = 'both')]
+# morfo[, V2 := trimws(gsub("'", '', gsub(',', '|', V2)), which = 'both')]
+# morfo[V2 == 'missing', V2 := NA]
+# 
+# morfo <- morfo[, {
+#   codigos <- unlist(strsplit(V2, "\\|"))
+#   temp <- data.table(var1 = V1, codigo = codigos)
+#   temp[, c("var2", "var3") := tstrsplit(codigo, "/", fixed = TRUE)]
+#   temp[, var2 := as.numeric(var2)]
+#   temp[, var3 := fifelse(is.na(var3), NA, var3)]  # NA a cadena vacía
+#   temp[, codigo := NULL]
+#   temp
+# }, by = 1:nrow(morfo)][, .(var1, var2, var3)]
+# 
+# morfo[,.N] == unique(morfo)[,.N] # són iguals
+# 
+# rm(prova, morfo)
+
 
 #### tracte aerodigestiu superior #### 
-# sols cal treballar aquells registres que no es podien classificar amb els càncers d'estòmac/esòfac
-
 # treballem primer amb la taula candiag
-if(candiag[grepl(paste0('^C15'), locatum, ignore.case = T) & subcateg == 'Not classified',.N] > 0){
+if(candiag[grepl(paste0(paste0('^C0', c(0:7,9), collapse = '|'), '|', paste0('^C', c(10:15,32), collapse = '|')), locatum, ignore.case = T),.N] > 0){
   # per aquest començarem a incorporar les subcategories i inclusions/exclusions
-  uadt <- copy(candiag[grepl('^C15', locatum, ignore.case = T) & subcateg == 'Not classified', 
-                       .(id, datadiag, locatum, morfotum, tipustum, clas_iarc = 'Uadt')])
+  uadt <- copy(candiag[grepl(paste0(paste0('^C0', c(0:7,9), collapse = '|'), '|', paste0('^C', c(10:15,32), collapse = '|')), locatum, ignore.case = T), 
+                       .(id, datadiag, locatum, cie10 = substr(locatum, 1, 3), morfotum, tipustum, clas_iarc = 'Uadt')])
+  
+  cie <- c(paste0('C0', c(0:7,9)), paste0('C', c(10:15,32)))
   
   # carcinoma de cèl·lules escamoses
   cat <- dicc_can[wg_abbrev == 'Uadt' & subcategory == "01-UADT squamous cell carcinoma"]$definition
@@ -1534,15 +1620,23 @@ if(candiag[grepl(paste0('^C15'), locatum, ignore.case = T) & subcateg == 'Not cl
   cat <- gsub(' +', '', cat, fixed = T)
   
   morfo <- unlist(strsplit(cat, split = '|', fixed = T))
-  morfo <- as.data.table(t(do.call(rbind, strsplit(morfo, split = ',', fixed = T))))
-  morfo[, V1 := gsub("'", '', V1)]
+  # 29/4/26: hem de canviar el valor de C15 per la resta de codis per eliminar aquest valor de la comparativa
+  morfo <- rep(morfo, length(cie[cie != 'C15']))
+  morfo[seq(1, length(morfo)-1, 2)] <- cie[cie != 'C15']
+  
+  morfo <- data.table(V1 = morfo[seq(1, length(morfo)-1, 2)], V2 = morfo[seq(2, length(morfo), 2)])
   morfo[, V2 := gsub("'", '', V2)]
   
-  morfo <- morfo[, c("var2", "var3") := tstrsplit(V2, "/", fixed = TRUE, type.convert = TRUE)]
-  morfo[, `:=`(var2 = as.character(var2), var3 = as.character(var3))]
+  morfo <- morfo[, {
+    val <- unlist(strsplit(V2, "\\,"))
+    rbindlist(lapply(val, function(x) {
+      part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE)
+      data.table(var1 = trimws(V1, which = 'both'), var2 = as.character(part[[1]]), var3 = as.character(part[[2]]))
+    }))
+  }, by = 1:nrow(morfo)][, .(var1, var2, var3)]
   
-  uadt <- merge(uadt, morfo[, .(locatum = V1, morfotum = var2, tipustum = var3, scc = 1)], 
-                by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
+  uadt <- merge(uadt, morfo[, .(cie10 = var1, morfotum = var2, tipustum = var3, scc = 1)], 
+                by = c('cie10', 'morfotum', 'tipustum'), all.x = T)
   
   # altres uadt
   cat <- dicc_can[wg_abbrev == 'Uadt' & subcategory == "02-UADT others"]$definition
@@ -1550,15 +1644,23 @@ if(candiag[grepl(paste0('^C15'), locatum, ignore.case = T) & subcateg == 'Not cl
   cat <- gsub(' +', '', cat, fixed = T)
   
   morfo <- unlist(strsplit(cat, split = '|', fixed = T))
-  morfo <- as.data.table(t(do.call(rbind, strsplit(morfo, split = ',', fixed = T))))
-  morfo[, V1 := gsub("'", '', V1)]
+  # 29/4/26: hem de canviar el valor de C15 per la resta de codis per eliminar aquest valor de la comparativa
+  morfo <- rep(morfo, length(cie[cie != 'C15']))
+  morfo[seq(1, length(morfo)-1, 2)] <- cie[cie != 'C15']
+  
+  morfo <- data.table(V1 = morfo[seq(1, length(morfo)-1, 2)], V2 = morfo[seq(2, length(morfo), 2)])
   morfo[, V2 := gsub("'", '', V2)]
   
-  morfo <- morfo[, c("var2", "var3") := tstrsplit(V2, "/", fixed = TRUE, type.convert = TRUE)]
-  morfo[, `:=`(var2 = as.character(var2), var3 = as.character(var3))]
+  morfo <- morfo[, {
+    val <- unlist(strsplit(V2, "\\,"))
+    rbindlist(lapply(val, function(x) {
+      part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE)
+      data.table(var1 = trimws(V1, which = 'both'), var2 = as.character(part[[1]]), var3 = as.character(part[[2]]))
+    }))
+  }, by = 1:nrow(morfo)][, .(var1, var2, var3)]
   
-  uadt <- merge(uadt, morfo[, .(locatum = V1, morfotum = var2, tipustum = var3, oth = 1)], 
-                by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
+  uadt <- merge(uadt, morfo[, .(cie10 = var1, morfotum = var2, tipustum = var3, oth = 1)], 
+                by = c('cie10', 'morfotum', 'tipustum'), all.x = T)
   
   # uadt ineligible
   cat <- dicc_can[wg_abbrev == 'Uadt' & subcategory == "08-UADT ineligible"]$definition
@@ -1566,42 +1668,106 @@ if(candiag[grepl(paste0('^C15'), locatum, ignore.case = T) & subcateg == 'Not cl
   cat <- gsub(' +', '', cat, fixed = T)
   
   morfo <- unlist(strsplit(cat, split = '|', fixed = T))
-  morfo <- as.data.table(t(do.call(rbind, strsplit(morfo, split = ',', fixed = T))))
-  morfo[, V1 := gsub("'", '', V1)]
+  # 29/4/26: hem de canviar el valor de C15 per la resta de codis per eliminar aquest valor de la comparativa
+  morfo <- rep(morfo, length(cie[cie != 'C15']))
+  morfo[seq(1, length(morfo)-1, 2)] <- cie[cie != 'C15']
+  
+  morfo <- data.table(V1 = morfo[seq(1, length(morfo)-1, 2)], V2 = morfo[seq(2, length(morfo), 2)])
   morfo[, V2 := gsub("'", '', V2)]
   
-  morfo <- morfo[, c("var2", "var3") := tstrsplit(V2, "/", fixed = TRUE, type.convert = TRUE)]
-  morfo[, `:=`(var2 = as.character(var2), var3 = as.character(var3))]
+  morfo <- morfo[, {
+    codigos <- unlist(strsplit(V2, "\\,"))
+    temp <- data.table(var1 = V1, codigo = codigos)
+    temp[, c("var2", "var3") := tstrsplit(codigo, "/", fixed = TRUE)]
+    temp[, var2 := as.character(var2)]
+    temp[, var3 := fifelse(is.na(var3), NA, var3)]  # NA a cadena vacía
+    temp[, codigo := NULL]
+    temp
+  }, by = 1:nrow(morfo)][, .(var1, var2, var3)]
   
-  uadt <- merge(uadt, morfo[, .(locatum = V1, morfotum = var2, tipustum = var3, inel = 1)], 
-                by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
+  uadt <- merge(uadt, morfo[, .(cie10 = var1, morfotum = var2, tipustum = var3, inel = 1)], 
+                by = c('cie10', 'morfotum', 'tipustum'), all.x = T)
   
   # uadt missing
-  uadt[, u_mis := ifelse(is.na(morfotum), 1, NA)]
+  uadt[cie10 != 'C15', u_mis := ifelse(is.na(morfotum), 1, NA)]
+  
+  # carcinoma de cèl·lules escamoses esòfac
+  cat <- dicc_can[wg_abbrev == 'Uadt' & subcategory == "11-Esophagus squamous cell carcinoma"]$definition
+  cat <- gsub('site eq ', '', gsub(' + ', '|', cat, fixed = T))
+  cat <- gsub(' +', '', cat, fixed = T)
+  
+  morfo <- unlist(strsplit(cat, split = '|', fixed = T))
+  morfo <- as.data.table(t(do.call(rbind, strsplit(morfo, split = ',', fixed = T))))
+  morfo[, V2 := trimws(gsub("'", '', V2))]
+  morfo <- morfo[, c("var2", "var3") := tstrsplit(V2, "/", fixed = TRUE, type.convert = TRUE)]
+  
+  uadt <- merge(uadt, morfo[, .(cie10 = V1, morfotum = as.character(var2), tipustum = as.character(var3), e_scc = 1)], 
+                by = c('cie10', 'morfotum', 'tipustum'), all.x = T)
+  
+  # altres esòfac
+  cat <- dicc_can[wg_abbrev == 'Uadt' & subcategory == "12-Esophagus others"]$definition
+  cat <- gsub('site eq ', '', gsub(' + ', '|', cat, fixed = T))
+  cat <- gsub(' +', '', cat, fixed = T)
+  
+  morfo <- unlist(strsplit(cat, split = '|', fixed = T))
+  morfo <- as.data.table(t(do.call(rbind, strsplit(morfo, split = ',', fixed = T))))
+  morfo[, V2 := trimws(gsub("'", '', V2))]
+  morfo <- morfo[, c("var2", "var3") := tstrsplit(V2, "/", fixed = TRUE, type.convert = TRUE)]
+  
+  uadt <- merge(uadt, morfo[, .(cie10 = V1, morfotum = as.character(var2), tipustum = as.character(var3), e_oth = 1)], 
+                by = c('cie10', 'morfotum', 'tipustum'), all.x = T)
+  
+  # esòfac ineligible
+  cat <- dicc_can[wg_abbrev == 'Uadt' & subcategory == "18-Esophagus ineligible"]$definition
+  cat <- gsub('site eq ', '', gsub(' + ', '|', cat, fixed = T))
+  cat <- gsub(' +', '', cat, fixed = T)
+  
+  morfo <- unlist(strsplit(cat, split = '|', fixed = T))
+  morfo <- as.data.table(t(do.call(rbind, strsplit(morfo, split = ',', fixed = T))))
+  morfo[, V2 := trimws(gsub("'", '', V2))]
+  morfo <- morfo[, c("var2", "var3") := tstrsplit(V2, "/", fixed = TRUE, type.convert = TRUE)]
+  
+  uadt <- merge(uadt, morfo[, .(cie10 = V1, morfotum = as.character(var2), tipustum = as.character(var3), e_inel = 1)], 
+                by = c('cie10', 'morfotum', 'tipustum'), all.x = T)
+  
+  # esòfac missing
+  uadt[cie10 == 'C15', e_mis := ifelse(is.na(morfotum), 1, NA)]
   
   # codifiquem les subcategories
   uadt[scc == 1, `:=`(subcateg = 'UADT squamous cell carcinoma', inc_excl = 'Included')]
   uadt[oth == 1, `:=`(subcateg = 'UADT others', inc_excl = 'Included')]
   uadt[inel == 1, `:=`(subcateg = 'UADT inelegible', inc_excl = 'Included')]
   uadt[u_mis == 1, `:=`(subcateg = 'UADT missing', inc_excl = 'Excluded')]
+  uadt[e_scc == 1, `:=`(subcateg = 'Esophagus squamous cell carcinoma', inc_excl = 'Included')]
+  uadt[e_oth == 1, `:=`(subcateg = 'Esophagus others', inc_excl = 'Included')]
+  uadt[e_inel == 1, `:=`(subcateg = 'Esophagus inelegible', inc_excl = 'Included')]
+  uadt[e_mis == 1, `:=`(subcateg = 'Esophagus missing', inc_excl = 'Excluded')]
   
   # classifiquem els que queden pendents com a morfologia ineligible segons el diccionari
-  uadt[is.na(subcateg), `:=`(subcateg = 'UADT ineligible', inc_excl = 'Included')]
+  uadt[is.na(subcateg) & cie10 != 'C15', `:=`(subcateg = 'UADT ineligible', inc_excl = 'Included')]
+  uadt[is.na(subcateg) & cie10 == 'C15', `:=`(subcateg = 'Esophagus ineligible', inc_excl = 'Included')]
   
   candiag <- merge(candiag, uadt[, .(id, datadiag, locatum, morfotum, tipustum, clas_iarc_cor = clas_iarc,
                                      subcateg_cor = subcateg, inc_excl_cor = inc_excl)],
                    by = c('id', 'datadiag', 'locatum', 'morfotum', 'tipustum'), all.x = T)
-  candiag[!is.na(clas_iarc_cor), clas_iarc := clas_iarc_cor]
-  candiag[!is.na(subcateg_cor), subcateg := subcateg_cor]
-  candiag[!is.na(inc_excl_cor), inc_excl := inc_excl_cor]
+  
+  # 29/4/26: classifiquem sols els que no estan classificats com a càncer d'esòfac en la categoria Stom
+  candiag[!is.na(clas_iarc_cor) & clas_iarc != 'Stom', clas_iarc := clas_iarc_cor]
+  
+  # en el creuament de les variables subcateg tenim que hi ha alguns que poden aportar informació
+  candiag[!is.na(subcateg_cor) & (clas_iarc != 'Stom' | (clas_iarc == 'Stom' & 
+            subcateg == 'Not classified')), `:=`(clas_iarc = clas_iarc_cor, subcateg = subcateg_cor)]
+  candiag[!is.na(inc_excl_cor), inc_excl := inc_excl_cor] # no hi ha problema perquè el que estava a dubte el corregim i la resta es mantenen igual
   candiag[, c('clas_iarc_cor', 'subcateg_cor', 'inc_excl_cor') := NULL]
 }
 
 # ho repetim a la taula canpreva
-if(canpreva[grepl(paste0('^C15'), locatum, ignore.case = T) & subcateg == 'Not classified',.N] > 0){
+if(canpreva[grepl(paste0(paste0('^C0', c(0:7,9), collapse = '|'), '|', paste0('^C', c(10:15,32), collapse = '|')), locatum, ignore.case = T),.N] > 0){
   # per aquest començarem a incorporar les subcategories i inclusions/exclusions
-  uadt <- copy(canpreva[grepl('^C15', locatum, ignore.case = T) & subcateg == 'Not classified', 
-                       .(id, datadiag, locatum, morfotum, tipustum, clas_iarc = 'Uadt')])
+  uadt <- copy(canpreva[grepl(paste0(paste0('^C0', c(0:7,9), collapse = '|'), '|', paste0('^C', c(10:15,32), collapse = '|')), locatum, ignore.case = T), 
+                       .(id, datadiag, locatum, cie10 = substr(locatum, 1, 3), morfotum, tipustum, clas_iarc = 'Uadt')])
+  
+  cie <- c(paste0('C0', c(0:7,9)), paste0('C', c(10:15,32)))
   
   # carcinoma de cèl·lules escamoses
   cat <- dicc_can[wg_abbrev == 'Uadt' & subcategory == "01-UADT squamous cell carcinoma"]$definition
@@ -1609,15 +1775,23 @@ if(canpreva[grepl(paste0('^C15'), locatum, ignore.case = T) & subcateg == 'Not c
   cat <- gsub(' +', '', cat, fixed = T)
   
   morfo <- unlist(strsplit(cat, split = '|', fixed = T))
-  morfo <- as.data.table(t(do.call(rbind, strsplit(morfo, split = ',', fixed = T))))
-  morfo[, V1 := gsub("'", '', V1)]
+  # 29/4/26: hem de canviar el valor de C15 per la resta de codis per eliminar aquest valor de la comparativa
+  morfo <- rep(morfo, length(cie[cie != 'C15']))
+  morfo[seq(1, length(morfo)-1, 2)] <- cie[cie != 'C15']
+  
+  morfo <- data.table(V1 = morfo[seq(1, length(morfo)-1, 2)], V2 = morfo[seq(2, length(morfo), 2)])
   morfo[, V2 := gsub("'", '', V2)]
   
-  morfo <- morfo[, c("var2", "var3") := tstrsplit(V2, "/", fixed = TRUE, type.convert = TRUE)]
-  morfo[, `:=`(var2 = as.character(var2), var3 = as.character(var3))]
+  morfo <- morfo[, {
+    val <- unlist(strsplit(V2, "\\,"))
+    rbindlist(lapply(val, function(x) {
+      part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE)
+      data.table(var1 = trimws(V1, which = 'both'), var2 = as.character(part[[1]]), var3 = as.character(part[[2]]))
+    }))
+  }, by = 1:nrow(morfo)][, .(var1, var2, var3)]
   
-  uadt <- merge(uadt, morfo[, .(locatum = V1, morfotum = var2, tipustum = var3, scc = 1)], 
-                by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
+  uadt <- merge(uadt, morfo[, .(cie10 = var1, morfotum = as.numeric(var2), tipustum = as.numeric(var3), scc = 1)], 
+                by = c('cie10', 'morfotum', 'tipustum'), all.x = T)
   
   # altres uadt
   cat <- dicc_can[wg_abbrev == 'Uadt' & subcategory == "02-UADT others"]$definition
@@ -1625,15 +1799,23 @@ if(canpreva[grepl(paste0('^C15'), locatum, ignore.case = T) & subcateg == 'Not c
   cat <- gsub(' +', '', cat, fixed = T)
   
   morfo <- unlist(strsplit(cat, split = '|', fixed = T))
-  morfo <- as.data.table(t(do.call(rbind, strsplit(morfo, split = ',', fixed = T))))
-  morfo[, V1 := gsub("'", '', V1)]
+  # 29/4/26: hem de canviar el valor de C15 per la resta de codis per eliminar aquest valor de la comparativa
+  morfo <- rep(morfo, length(cie[cie != 'C15']))
+  morfo[seq(1, length(morfo)-1, 2)] <- cie[cie != 'C15']
+  
+  morfo <- data.table(V1 = morfo[seq(1, length(morfo)-1, 2)], V2 = morfo[seq(2, length(morfo), 2)])
   morfo[, V2 := gsub("'", '', V2)]
   
-  morfo <- morfo[, c("var2", "var3") := tstrsplit(V2, "/", fixed = TRUE, type.convert = TRUE)]
-  morfo[, `:=`(var2 = as.character(var2), var3 = as.character(var3))]
+  morfo <- morfo[, {
+    val <- unlist(strsplit(V2, "\\,"))
+    rbindlist(lapply(val, function(x) {
+      part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE)
+      data.table(var1 = trimws(V1, which = 'both'), var2 = as.character(part[[1]]), var3 = as.character(part[[2]]))
+    }))
+  }, by = 1:nrow(morfo)][, .(var1, var2, var3)]
   
-  uadt <- merge(uadt, morfo[, .(locatum = V1, morfotum = var2, tipustum = var3, oth = 1)], 
-                by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
+  uadt <- merge(uadt, morfo[, .(cie10 = var1, morfotum = as.numeric(var2), tipustum = as.numeric(var3), oth = 1)], 
+                by = c('cie10', 'morfotum', 'tipustum'), all.x = T)
   
   # uadt ineligible
   cat <- dicc_can[wg_abbrev == 'Uadt' & subcategory == "08-UADT ineligible"]$definition
@@ -1641,38 +1823,97 @@ if(canpreva[grepl(paste0('^C15'), locatum, ignore.case = T) & subcateg == 'Not c
   cat <- gsub(' +', '', cat, fixed = T)
   
   morfo <- unlist(strsplit(cat, split = '|', fixed = T))
-  morfo <- as.data.table(t(do.call(rbind, strsplit(morfo, split = ',', fixed = T))))
-  morfo[, V1 := gsub("'", '', V1)]
+  # 29/4/26: hem de canviar el valor de C15 per la resta de codis per eliminar aquest valor de la comparativa
+  morfo <- rep(morfo, length(cie[cie != 'C15']))
+  morfo[seq(1, length(morfo)-1, 2)] <- cie[cie != 'C15']
+  
+  morfo <- data.table(V1 = morfo[seq(1, length(morfo)-1, 2)], V2 = morfo[seq(2, length(morfo), 2)])
   morfo[, V2 := gsub("'", '', V2)]
   
-  morfo <- morfo[, c("var2", "var3") := tstrsplit(V2, "/", fixed = TRUE, type.convert = TRUE)]
-  morfo[, `:=`(var2 = as.character(var2), var3 = as.character(var3))]
+  morfo <- morfo[, {
+    codigos <- unlist(strsplit(V2, "\\,"))
+    temp <- data.table(var1 = V1, codigo = codigos)
+    temp[, c("var2", "var3") := tstrsplit(codigo, "/", fixed = TRUE)]
+    temp[, var2 := as.character(var2)]
+    temp[, var3 := fifelse(is.na(var3), NA, var3)]  # NA a cadena vacía
+    temp[, codigo := NULL]
+    temp
+  }, by = 1:nrow(morfo)][, .(var1, var2, var3)]
   
-  uadt <- merge(uadt, morfo[, .(locatum = V1, morfotum = var2, tipustum = var3, inel = 1)], 
-                by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
+  uadt <- merge(uadt, morfo[, .(cie10 = var1, morfotum = as.numeric(var2), tipustum = as.numeric(var3), inel = 1)], 
+                by = c('cie10', 'morfotum', 'tipustum'), all.x = T)
   
   # uadt missing
-  uadt[, u_mis := ifelse(is.na(morfotum), 1, NA)]
+  uadt[cie10 != 'C15', u_mis := ifelse(is.na(morfotum), 1, NA)]
+  
+  # carcinoma de cèl·lules escamoses esòfac
+  cat <- dicc_can[wg_abbrev == 'Uadt' & subcategory == "11-Esophagus squamous cell carcinoma"]$definition
+  cat <- gsub('site eq ', '', gsub(' + ', '|', cat, fixed = T))
+  cat <- gsub(' +', '', cat, fixed = T)
+  
+  morfo <- unlist(strsplit(cat, split = '|', fixed = T))
+  morfo <- as.data.table(t(do.call(rbind, strsplit(morfo, split = ',', fixed = T))))
+  morfo[, V2 := trimws(gsub("'", '', V2))]
+  morfo <- morfo[, c("var2", "var3") := tstrsplit(V2, "/", fixed = TRUE, type.convert = TRUE)]
+  
+  uadt <- merge(uadt, morfo[, .(cie10 = V1, morfotum = as.numeric(var2), tipustum = as.numeric(var3), e_scc = 1)], 
+                by = c('cie10', 'morfotum', 'tipustum'), all.x = T)
+  
+  # altres esòfac
+  cat <- dicc_can[wg_abbrev == 'Uadt' & subcategory == "12-Esophagus others"]$definition
+  cat <- gsub('site eq ', '', gsub(' + ', '|', cat, fixed = T))
+  cat <- gsub(' +', '', cat, fixed = T)
+  
+  morfo <- unlist(strsplit(cat, split = '|', fixed = T))
+  morfo <- as.data.table(t(do.call(rbind, strsplit(morfo, split = ',', fixed = T))))
+  morfo[, V2 := trimws(gsub("'", '', V2))]
+  morfo <- morfo[, c("var2", "var3") := tstrsplit(V2, "/", fixed = TRUE, type.convert = TRUE)]
+  
+  uadt <- merge(uadt, morfo[, .(cie10 = V1, morfotum = as.numeric(var2), tipustum = as.numeric(var3), e_oth = 1)], 
+                by = c('cie10', 'morfotum', 'tipustum'), all.x = T)
+  
+  # esòfac ineligible
+  cat <- dicc_can[wg_abbrev == 'Uadt' & subcategory == "18-Esophagus ineligible"]$definition
+  cat <- gsub('site eq ', '', gsub(' + ', '|', cat, fixed = T))
+  cat <- gsub(' +', '', cat, fixed = T)
+  
+  morfo <- unlist(strsplit(cat, split = '|', fixed = T))
+  morfo <- as.data.table(t(do.call(rbind, strsplit(morfo, split = ',', fixed = T))))
+  morfo[, V2 := trimws(gsub("'", '', V2))]
+  morfo <- morfo[, c("var2", "var3") := tstrsplit(V2, "/", fixed = TRUE, type.convert = TRUE)]
+  
+  uadt <- merge(uadt, morfo[, .(cie10 = V1, morfotum = as.numeric(var2), tipustum = as.numeric(var3), e_inel = 1)], 
+                by = c('cie10', 'morfotum', 'tipustum'), all.x = T)
+  
+  # esòfac missing
+  uadt[cie10 == 'C15', e_mis := ifelse(is.na(morfotum), 1, NA)]
   
   # codifiquem les subcategories
   uadt[scc == 1, `:=`(subcateg = 'UADT squamous cell carcinoma', inc_excl = 'Included')]
   uadt[oth == 1, `:=`(subcateg = 'UADT others', inc_excl = 'Included')]
   uadt[inel == 1, `:=`(subcateg = 'UADT inelegible', inc_excl = 'Included')]
   uadt[u_mis == 1, `:=`(subcateg = 'UADT missing', inc_excl = 'Excluded')]
+  uadt[e_scc == 1, `:=`(subcateg = 'Esophagus squamous cell carcinoma', inc_excl = 'Included')]
+  uadt[e_oth == 1, `:=`(subcateg = 'Esophagus others', inc_excl = 'Included')]
+  uadt[e_inel == 1, `:=`(subcateg = 'Esophagus inelegible', inc_excl = 'Included')]
+  uadt[e_mis == 1, `:=`(subcateg = 'Esophagus missing', inc_excl = 'Excluded')]
   
   # classifiquem els que queden pendents com a morfologia ineligible segons el diccionari
-  uadt[is.na(subcateg), `:=`(subcateg = 'UADT ineligible', inc_excl = 'Included')]
+  uadt[is.na(subcateg) & cie10 != 'C15', `:=`(subcateg = 'UADT ineligible', inc_excl = 'Included')]
+  uadt[is.na(subcateg) & cie10 == 'C15', `:=`(subcateg = 'Esophagus ineligible', inc_excl = 'Included')]
   
   canpreva <- merge(canpreva, uadt[, .(id, datadiag, locatum, morfotum, tipustum, clas_iarc_cor = clas_iarc,
                                      subcateg_cor = subcateg, inc_excl_cor = inc_excl)],
                    by = c('id', 'datadiag', 'locatum', 'morfotum', 'tipustum'), all.x = T)
-  canpreva[!is.na(clas_iarc_cor), clas_iarc := clas_iarc_cor]
-  canpreva[!is.na(subcateg_cor), subcateg := subcateg_cor]
-  canpreva[!is.na(inc_excl_cor), inc_excl := inc_excl_cor]
+  
+  # 29/4/26: classifiquem sols els que no estan classificats com a càncer d'esòfac en la categoria Stom
+  canpreva[!is.na(clas_iarc_cor) & clas_iarc != 'Stom', clas_iarc := clas_iarc_cor]
+  canpreva[!is.na(subcateg_cor) & is.na(subcateg), subcateg := subcateg_cor]
+  canpreva[!is.na(inc_excl_cor), inc_excl := inc_excl_cor] # no hi ha problema perquè el que estava a dubte el corregim i la resta es mantenen igual
   canpreva[, c('clas_iarc_cor', 'subcateg_cor', 'inc_excl_cor') := NULL]
 }
 
-rm(uadt, cat, morfo)
+rm(uadt, cat, morfo, cie)
 
 
 #### tiroides #### 
@@ -2715,7 +2956,7 @@ if(canpreva[grepl(paste0('^', codis, collapse = '|'), morfotum, ignore.case = T)
     morfo <- unlist(strsplit(cat, split = '&', fixed = T))
     morfo <- as.data.table(do.call(rbind, strsplit(morfo, split = '/', fixed = T)))
     
-    lymp <- merge(lymp, morfo[, .(morfotum = V1, tipustum = V2, subcateg_cor = res, inc_excl_cor = 'Included')], 
+    lymp <- merge(lymp, morfo[, .(morfotum = as.numeric(V1), tipustum = as.numeric(V2), subcateg_cor = res, inc_excl_cor = 'Included')], 
                   by = c('morfotum', 'tipustum'), all.x = T)
     lymp[!is.na(subcateg_cor), subcateg := subcateg_cor]
     lymp[!is.na(inc_excl_cor), inc_excl := inc_excl_cor]
