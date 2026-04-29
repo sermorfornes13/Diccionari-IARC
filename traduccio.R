@@ -1915,6 +1915,8 @@ if(canpreva[grepl(paste0(paste0('^C0', c(0:7,9), collapse = '|'), '|', paste0('^
 
 rm(uadt, cat, morfo, cie)
 
+# no cal fer comprovació de duplicitat, ja que els codis són excloents
+
 
 #### tiroides #### 
 # treballem primer amb la taula candiag
@@ -1966,6 +1968,7 @@ if(candiag[grepl('^C73', locatum, ignore.case = T),.N] > 0){
   
   morfo <- unlist(strsplit(cat, split = ' ', fixed = T))
   morfo <- as.numeric(morfo[!is.na(as.numeric(morfo))])
+  morfo <- c(morfo[1]:morfo[2], morfo[!c(1:2)])
   
   thyr[morfotum %in% morfo, noesp := 1]
   
@@ -2039,6 +2042,7 @@ if(canpreva[grepl('^C73', locatum, ignore.case = T),.N] > 0){
   
   morfo <- unlist(strsplit(cat, split = ' ', fixed = T))
   morfo <- as.numeric(morfo[!is.na(as.numeric(morfo))])
+  morfo <- c(morfo[1]:morfo[2], morfo[!c(1:2)])
   
   thyr[morfotum %in% morfo, noesp := 1]
   
@@ -2067,6 +2071,32 @@ if(canpreva[grepl('^C73', locatum, ignore.case = T),.N] > 0){
 }
 
 rm(thyr, cat, morfo)
+
+# comprovem si hi ha algun codi duplicat
+prova <- dicc_can[wg_abbrev == 'Thyr', definition][1:6]
+
+aux1 <- prova[grepl('Morpnum', prova, fixed = T)][1]
+aux1 <- gsub('(', '', gsub(')', '', aux1, fixed = T), fixed = T)
+aux1 <- gsub(',', ' ', aux1, fixed = T)
+aux1 <- unlist(strsplit(aux1, split = ' ', fixed = T))
+aux1 <- as.numeric(aux1[!is.na(as.numeric(aux1))])
+aux1 <- c(aux1[1]:aux1[2], aux1[!c(1:2)])
+
+aux2 <- prova[grepl('Morpnum', prova, fixed = T)][2]
+aux2 <- gsub('(', '', gsub(')', '', aux2, fixed = T), fixed = T)
+aux2 <- gsub(',', ' ', aux2, fixed = T)
+aux2 <- unlist(strsplit(aux2, split = ' ', fixed = T))
+aux2 <- as.numeric(aux2[!is.na(as.numeric(aux2))])
+aux2 <- c(aux2[1]:aux2[2], aux2[!c(1:2)])
+
+prova <- c(prova[!grepl('Morpnum', prova, fixed = T)], aux1, aux2)
+
+morfo <- unlist(strsplit(prova, split = '|', fixed = T))
+morfo <- as.data.table(do.call(rbind, strsplit(morfo, split = '/', fixed = T)))
+morfo[V1 == V2, V2 := NA]
+
+morfo[,.N] == unique(morfo)[,.N] # són iguals
+rm(morfo, prova)
 
 
 #### mama #### 
