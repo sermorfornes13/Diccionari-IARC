@@ -202,7 +202,7 @@ if(candiag[grepl('^C50', locatum, ignore.case = T),.N] > 0){
   brea[mis == 1, `:=`(subcateg = 'Breast missing', inc_excl = 'Excluded')]
 
   # classifiquem els que queden pendents com a no classificables
-  brea[is.na(subcateg), `:=`(subcateg = 'Not unclassified', inc_excl = 'Doubt')]
+  brea[is.na(subcateg), `:=`(subcateg = 'Not classified', inc_excl = 'Doubt')]
   
   candiag <- merge(candiag, brea[, .(id, datadiag, locatum, morfotum, tipustum, clas_iarc_cor = clas_iarc,
                                      subcateg_cor = subcateg, inc_excl_cor = inc_excl)],
@@ -270,7 +270,7 @@ if(canpreva[grepl('^C50', locatum, ignore.case = T),.N] > 0){
   brea[mis == 1, `:=`(subcateg = 'Breast missing', inc_excl = 'Excluded')]
   
   # classifiquem els que queden pendents com a no classificables
-  brea[is.na(subcateg), `:=`(subcateg = 'Not unclassified', inc_excl = 'Doubt')]
+  brea[is.na(subcateg), `:=`(subcateg = 'Not classified', inc_excl = 'Doubt')]
   
   canpreva <- merge(canpreva, brea[, .(id, datadiag, locatum, morfotum, tipustum, clas_iarc_cor = clas_iarc,
                                      subcateg_cor = subcateg, inc_excl_cor = inc_excl)],
@@ -289,12 +289,13 @@ rm(brea, cat, morfo)
 # 
 # morfo <- unlist(strsplit(prova, split = ',', fixed = T))
 # morfo <- as.data.table(do.call(rbind, strsplit(morfo, split = '/', fixed = T)))
+# morfo[V1 == V2, V2 := NA]
 # 
 # morfo[,.N] == unique(morfo)[,.N] # hi ha duplicats
 # 
 # # comprovem quin valor hi ha duplicat
 # morfo[,.N, .(V1, V2)][N>1]
-# dicc_can[wg_abbrev == 'Brea' & grepl(morfo[,.N, .(V1, V2)][N>1][, paste0(V1, '/', V2, collapse = '|')], definition, ignore.case = T), 
+# dicc_can[wg_abbrev == 'Brea' & grepl(morfo[,.N, .(V1, V2)][N>1][, paste0(V1, '/', V2, collapse = '|')], definition, ignore.case = T),
 #          .(subcategory, definition)]
 # # sols veiem un duplicats en la mateixa subcategoria, ho comentarem amb la iarc per si és una errata o no
 # 
@@ -535,7 +536,7 @@ if(candiag[grepl('^C54', locatum, ignore.case = T),.N] > 0){
   coru[mis == 1, `:=`(subcateg = 'Missing', inc_excl = 'Excluded')]
   
   # classifiquem els que queden pendents com a no classificables
-  coru[is.na(subcateg), `:=`(subcateg = 'Not unclassified', inc_excl = 'Doubt')]
+  coru[is.na(subcateg), `:=`(subcateg = 'Not classified', inc_excl = 'Doubt')]
   
   candiag <- merge(candiag, coru[, .(id, datadiag, locatum, morfotum, tipustum, clas_iarc_cor = clas_iarc,
                                      subcateg_cor = subcateg, inc_excl_cor = inc_excl)],
@@ -603,7 +604,7 @@ if(canpreva[grepl('^C54', locatum, ignore.case = T),.N] > 0){
   coru[mis == 1, `:=`(subcateg = 'Missing', inc_excl = 'Excluded')]
   
   # classifiquem els que queden pendents com a no classificables
-  coru[is.na(subcateg), `:=`(subcateg = 'Not unclassified', inc_excl = 'Doubt')]
+  coru[is.na(subcateg), `:=`(subcateg = 'Not classified', inc_excl = 'Doubt')]
   
   canpreva <- merge(canpreva, coru[, .(id, datadiag, locatum, morfotum, tipustum, clas_iarc_cor = clas_iarc,
                                      subcateg_cor = subcateg, inc_excl_cor = inc_excl)],
@@ -622,6 +623,7 @@ rm(coru, cat, morfo)
 # 
 # morfo <- unlist(strsplit(prova, split = ',', fixed = T))
 # morfo <- as.data.table(do.call(rbind, strsplit(morfo, split = '/', fixed = T)))
+# morfo[V1 == V2, V2 := NA]
 # 
 # morfo[,.N] == unique(morfo)[,.N] # no hi ha duplicats
 # 
@@ -831,7 +833,7 @@ if(candiag[grepl(paste0('^', codis, collapse = '|'), morfotum, ignore.case = T),
   
   # ajuntem la informació que hem generat 
   
-  lymp[is.na(subcateg), `:=`(subcateg = 'Not unclassified', inc_excl = 'Doubt')]
+  lymp[is.na(subcateg), `:=`(subcateg = 'Not classified', inc_excl = 'Doubt')]
   
   candiag <- merge(candiag, lymp[, .(id, datadiag, locatum, morfotum, tipustum, clas_iarc_cor = clas_iarc,
                                      subcateg_cor = subcateg, inc_excl_cor = inc_excl)],
@@ -878,7 +880,7 @@ if(canpreva[grepl(paste0('^', codis, collapse = '|'), morfotum, ignore.case = T)
   
   # ajuntem la informació que hem generat 
   
-  lymp[is.na(subcateg), `:=`(subcateg = 'Not unclassified', inc_excl = 'Doubt')]
+  lymp[is.na(subcateg), `:=`(subcateg = 'Not classified', inc_excl = 'Doubt')]
   
   canpreva <- merge(canpreva, lymp[, .(id, datadiag, locatum, morfotum, tipustum, clas_iarc_cor = clas_iarc,
                                      subcateg_cor = subcateg, inc_excl_cor = inc_excl)],
@@ -899,6 +901,7 @@ rm(cat, codis, morfo, lymp, res)
 # 
 # morfo <- unlist(strsplit(prova, split = '&', fixed = T))
 # morfo <- as.data.table(do.call(rbind, strsplit(morfo, split = '/', fixed = T)))
+# morfo[V1 == V2, V2 := NA]
 # 
 # morfo[,.N] == unique(morfo)[,.N] # no hi ha duplicats
 # rm(prova, morfo)
@@ -1086,7 +1089,7 @@ if(candiag[grepl('^C56|^C48|^C570', locatum, ignore.case = T),.N] > 0){
   ovar[mis == 1, `:=`(subcateg = 'Missing', inc_excl = 'Excluded')]
   
   # classifiquem els que queden pendents com a no classificables
-  ovar[is.na(subcateg), `:=`(subcateg = 'Not unclassified', inc_excl = 'Doubt')]
+  ovar[is.na(subcateg), `:=`(subcateg = 'Not classified', inc_excl = 'Doubt')]
   
   candiag <- merge(candiag, ovar[, .(id, datadiag, locatum, morfotum, tipustum, clas_iarc_cor = clas_iarc,
                                      subcateg_cor = subcateg, inc_excl_cor = inc_excl)],
@@ -1259,7 +1262,7 @@ if(canpreva[grepl('^C56|^C48|^C570', locatum, ignore.case = T),.N] > 0){
   ovar[mis == 1, `:=`(subcateg = 'Missing', inc_excl = 'Excluded')]
   
   # classifiquem els que queden pendents com a no classificables
-  ovar[is.na(subcateg), `:=`(subcateg = 'Not unclassified', inc_excl = 'Doubt')]
+  ovar[is.na(subcateg), `:=`(subcateg = 'Not classified', inc_excl = 'Doubt')]
   
   canpreva <- merge(canpreva, ovar[, .(id, datadiag, locatum, morfotum, tipustum, clas_iarc_cor = clas_iarc,
                                      subcateg_cor = subcateg, inc_excl_cor = inc_excl)],
@@ -1272,33 +1275,35 @@ if(canpreva[grepl('^C56|^C48|^C570', locatum, ignore.case = T),.N] > 0){
 
 rm(ovar, cat, morfo)
 
-# # comprovem si hi ha algun codi duplicat
-# prova <- dicc_can[wg_abbrev == 'Ovar']$definition[1:21]
-# prova <- gsub('Site ', '', gsub('site ', '', prova, fixed = T), fixed = T)
-# prova <- gsub(' + ', '|', gsub("'", '', prova, fixed = T), fixed = T)
-# prova <- gsub(' +', '|', prova, fixed = T)
-# 
-# morfo <- as.data.table(do.call(rbind, strsplit(prova, split = '|', fixed = T)))
-# morfo[, `:=`(V1 = trimws(V1, which = 'both'), V2 = trimws(V2, which = 'both'))]
-# morfo[grepl('/,', V2, fixed = T), V2 := gsub('/,', '/99,', V2, fixed = T)]
-# 
-# morfo <- morfo[, {
-#   val <- unlist(strsplit(V2, ",")) 
-#   rbindlist(lapply(val, function(x) { 
-#     part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE) 
-#     data.table(var1 = trimws(V1, which = 'both'), var2 = as.character(part[[1]]), var3 = as.character(part[[2]]))
-#   }))
-# }, by = 1:nrow(morfo)][, .(var1, var2, var3)]
-# 
-# morfo[,.N] == unique(morfo)[,.N] # hi ha duplicats
-# 
-# # comprovem els duplicats que hi ha
-# morfo[,.N, .(var1, var2, var3)][N>1]
-# dicc_can[wg_abbrev == 'Ovar' & grepl(morfo[,.N, .(var1, var2, var3)][N>1][, paste0(var2, '/', var3, collapse = '|')],
-#               definition, ignore.case = T) & grepl(morfo[,.N, .(var1, var2, var3)][N>1]$var1, definition, fixed = T), .(subcategory, definition)]
-# 
-# # tenim que els tumors d'endometri i de cèl·lules clares tenen la mateixa codificació, s'hauria d'aclarir
-# rm(prova, morfo)
+# comprovem si hi ha algun codi duplicat
+prova <- dicc_can[wg_abbrev == 'Ovar']$definition[1:21]
+prova <- gsub('Site ', '', gsub('site ', '', prova, fixed = T), fixed = T)
+prova <- gsub(' + ', '|', gsub("'", '', prova, fixed = T), fixed = T)
+prova <- gsub(' +', '|', prova, fixed = T)
+
+morfo <- as.data.table(do.call(rbind, strsplit(prova, split = '|', fixed = T)))
+morfo[, `:=`(V1 = trimws(V1, which = 'both'), V2 = trimws(V2, which = 'both'))]
+morfo[grepl('/,', V2, fixed = T), V2 := gsub('/,', '/99,', V2, fixed = T)]
+
+morfo <- morfo[, {
+  val <- unlist(strsplit(V2, ","))
+  rbindlist(lapply(val, function(x) {
+    part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE)
+    data.table(var1 = trimws(V1, which = 'both'), var2 = as.character(part[[1]]), var3 = as.character(part[[2]]))
+  }))
+}, by = 1:nrow(morfo)][, .(var1, var2, var3)]
+if(morfo[var2 == var3, .N] > 0)
+  morfo[var2 == var3, var3 := NA]
+
+morfo[,.N] == unique(morfo)[,.N] # hi ha duplicats
+
+# comprovem els duplicats que hi ha
+morfo[,.N, .(var1, var2, var3)][N>1]
+dicc_can[wg_abbrev == 'Ovar' & grepl(morfo[,.N, .(var1, var2, var3)][N>1][, paste0(var2, '/', var3, collapse = '|')],
+              definition, ignore.case = T) & grepl(morfo[,.N, .(var1, var2, var3)][N>1]$var1, definition, fixed = T), .(subcategory, definition)]
+
+# tenim que els tumors d'endometri i de cèl·lules clares tenen la mateixa codificació, s'hauria d'aclarir
+rm(prova, morfo)
 
 
 #### 7) pròstata ####
@@ -1325,7 +1330,7 @@ if(candiag[grepl('^C61', locatum, ignore.case = T),.N] > 0){
        `:=`(subcateg = 'Others', inc_excl = 'Included')]
 
   # classifiquem els que queden pendents com a no classificables
-  pros[is.na(subcateg), `:=`(subcateg = 'Not unclassified', inc_excl = 'Doubt')]
+  pros[is.na(subcateg), `:=`(subcateg = 'Not classified', inc_excl = 'Doubt')]
   
   candiag <- merge(candiag, pros[, .(id, datadiag, locatum, tnmtype, ESTADTUM, clas_iarc_cor = clas_iarc,
                                      subcateg_cor = subcateg, inc_excl_cor = inc_excl)],
@@ -1381,7 +1386,7 @@ if(candiag[grepl('^C440', locatum, ignore.case = T) | grepl(paste0('^', 872:879,
   skin[is.na(morfotum), `:=`(subcateg = 'Skin missing', inc_excl = 'Included')]
   
   # classifiquem els que queden pendents com a no classificables
-  skin[is.na(subcateg), `:=`(subcateg = 'Not unclassified', inc_excl = 'Doubt')]
+  skin[is.na(subcateg), `:=`(subcateg = 'Not classified', inc_excl = 'Doubt')]
   
   candiag <- merge(candiag, skin[, .(id, datadiag, locatum, morfotum, tipustum, clas_iarc_cor = clas_iarc,
                                      subcateg_cor = subcateg, inc_excl_cor = inc_excl)],
@@ -1429,7 +1434,7 @@ if(canpreva[grepl('^C440', locatum, ignore.case = T) | grepl(paste0('^', 872:879
   skin[is.na(morfotum), `:=`(subcateg = 'Skin missing', inc_excl = 'Included')]
   
   # classifiquem els que queden pendents com a no classificables
-  skin[is.na(subcateg), `:=`(subcateg = 'Not unclassified', inc_excl = 'Doubt')]
+  skin[is.na(subcateg), `:=`(subcateg = 'Not classified', inc_excl = 'Doubt')]
   
   canpreva <- merge(canpreva, skin[, .(id, datadiag, locatum, morfotum, tipustum, clas_iarc_cor = clas_iarc,
                                      subcateg_cor = subcateg, inc_excl_cor = inc_excl)],
@@ -1452,7 +1457,7 @@ rm(skin)
 # rm(morfo, prova)
 
 
-#### 9) estòmac i esòfac #### 
+#### 9) estómac i esòfag #### 
 # treballem primer amb la taula candiag
 if(candiag[grepl('^C15|^C16', locatum, ignore.case = T),.N] > 0){
   # per aquest començarem a incorporar les subcategories i inclusions/exclusions
@@ -1835,29 +1840,34 @@ if(canpreva[grepl('^C15|^C16', locatum, ignore.case = T),.N] > 0){
 
 rm(stom, cat, morfo)
 
-# # comprovem si hi ha algun codi duplicat
-# prova <- dicc_can[wg_abbrev == 'Stom']$definition[1:13]
-# prova <- gsub('Site ', '', gsub('+ ', ' & ', prova, fixed = T), fixed = T)
-# prova <- gsub("'", '', prova)
-# 
-# morfo <- as.data.table(do.call(rbind, strsplit(prova, split = '&', fixed = T)))
-# morfo[, V1 := trimws(gsub("'", '', V1), which = 'both')]
-# morfo[, V2 := trimws(gsub("'", '', gsub(',', '|', V2)), which = 'both')]
-# morfo[V2 == 'missing', V2 := NA]
-# 
-# morfo <- morfo[, {
-#   codigos <- unlist(strsplit(V2, "\\|"))
-#   temp <- data.table(var1 = V1, codigo = codigos)
-#   temp[, c("var2", "var3") := tstrsplit(codigo, "/", fixed = TRUE)]
-#   temp[, var2 := as.numeric(var2)]
-#   temp[, var3 := fifelse(is.na(var3), NA, var3)]  # NA a cadena vacía
-#   temp[, codigo := NULL]
-#   temp
-# }, by = 1:nrow(morfo)][, .(var1, var2, var3)]
-# 
-# morfo[,.N] == unique(morfo)[,.N] # són iguals
-# 
-# rm(prova, morfo)
+# comprovem si hi ha algun codi duplicat
+prova <- dicc_can[wg_abbrev == 'Stom']$definition[1:13]
+prova <- gsub('Site ', '', gsub('+ ', ' & ', prova, fixed = T), fixed = T)
+prova <- gsub("'", '', prova)
+
+morfo <- as.data.table(do.call(rbind, strsplit(prova, split = '&', fixed = T)))
+morfo[, V1 := trimws(gsub("'", '', V1), which = 'both')]
+morfo[, V2 := trimws(gsub("'", '', gsub(',', '|', V2)), which = 'both')]
+morfo[V2 == 'missing', V2 := NA]
+
+morfo <- morfo[, {
+  codigos <- unlist(strsplit(V2, "\\|"))
+  temp <- data.table(var1 = V1, codigo = codigos)
+  temp[, c("var2", "var3") := tstrsplit(codigo, "/", fixed = TRUE)]
+  temp[, var2 := as.numeric(var2)]
+  temp[, var3 := fifelse(is.na(var3), NA, var3)]  # NA a cadena vacía
+  temp[, codigo := NULL]
+  temp
+}, by = 1:nrow(morfo)][, .(var1, var2, var3)]
+
+if(morfo[var2 == var3, .N] > 0)
+  morfo[var2 == var3, var3 := NA]
+
+morfo <- morfo[order(var1, var2, var3)]
+
+morfo[,.N] == unique(morfo)[,.N] # hi ha duplicats
+
+rm(prova, morfo)
 
 
 #### 10) tiroides #### 
