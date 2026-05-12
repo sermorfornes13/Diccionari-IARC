@@ -927,6 +927,10 @@ dicc_can[wg_abbrev == 'Lymp' & grepl(paste0('^', leuk[leuk %in% lymp], collapse 
 
 
 #### 6) ovari ####
+# 6/5/26: cal aclarir la classificació del codi C48 + 'xxxx/x' amb marta crous
+# 12/5/26: inclourem les dobles o múltiples classificacions dins de còpies de les variables que tenim
+# és a dir, crearem vàries variables de classificació de la iarc, subcategoria i inclusió/exclusió
+# revisar codi sas de la iarc i incorporar casuístiques al codi
 # treballem primer amb la taula candiag
 if(candiag[grepl('^C56|^C48|^C570', locatum, ignore.case = T),.N] > 0){
   # per aquest començarem a incorporar les subcategories i inclusions/exclusions
@@ -1275,35 +1279,36 @@ if(canpreva[grepl('^C56|^C48|^C570', locatum, ignore.case = T),.N] > 0){
 
 rm(ovar, cat, morfo)
 
-# comprovem si hi ha algun codi duplicat
-prova <- dicc_can[wg_abbrev == 'Ovar']$definition[1:21]
-prova <- gsub('Site ', '', gsub('site ', '', prova, fixed = T), fixed = T)
-prova <- gsub(' + ', '|', gsub("'", '', prova, fixed = T), fixed = T)
-prova <- gsub(' +', '|', prova, fixed = T)
-
-morfo <- as.data.table(do.call(rbind, strsplit(prova, split = '|', fixed = T)))
-morfo[, `:=`(V1 = trimws(V1, which = 'both'), V2 = trimws(V2, which = 'both'))]
-morfo[grepl('/,', V2, fixed = T), V2 := gsub('/,', '/99,', V2, fixed = T)]
-
-morfo <- morfo[, {
-  val <- unlist(strsplit(V2, ","))
-  rbindlist(lapply(val, function(x) {
-    part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE)
-    data.table(var1 = trimws(V1, which = 'both'), var2 = as.character(part[[1]]), var3 = as.character(part[[2]]))
-  }))
-}, by = 1:nrow(morfo)][, .(var1, var2, var3)]
-if(morfo[var2 == var3, .N] > 0)
-  morfo[var2 == var3, var3 := NA]
-
-morfo[,.N] == unique(morfo)[,.N] # hi ha duplicats
-
-# comprovem els duplicats que hi ha
-morfo[,.N, .(var1, var2, var3)][N>1]
-dicc_can[wg_abbrev == 'Ovar' & grepl(morfo[,.N, .(var1, var2, var3)][N>1][, paste0(var2, '/', var3, collapse = '|')],
-              definition, ignore.case = T) & grepl(morfo[,.N, .(var1, var2, var3)][N>1]$var1, definition, fixed = T), .(subcategory, definition)]
-
-# tenim que els tumors d'endometri i de cèl·lules clares tenen la mateixa codificació, s'hauria d'aclarir
-rm(prova, morfo)
+# # comprovem si hi ha algun codi duplicat
+# prova <- dicc_can[wg_abbrev == 'Ovar']$definition[1:21]
+# prova <- gsub('Site ', '', gsub('site ', '', prova, fixed = T), fixed = T)
+# prova <- gsub(' + ', '|', gsub("'", '', prova, fixed = T), fixed = T)
+# prova <- gsub(' +', '|', prova, fixed = T)
+# 
+# morfo <- as.data.table(do.call(rbind, strsplit(prova, split = '|', fixed = T)))
+# morfo[, `:=`(V1 = trimws(V1, which = 'both'), V2 = trimws(V2, which = 'both'))]
+# morfo[grepl('/,', V2, fixed = T), V2 := gsub('/,', '/99,', V2, fixed = T)]
+# 
+# morfo <- morfo[, {
+#   val <- unlist(strsplit(V2, ","))
+#   rbindlist(lapply(val, function(x) {
+#     part <- tstrsplit(x, "/", fixed = TRUE, type.convert = TRUE)
+#     data.table(var1 = trimws(V1, which = 'both'), var2 = as.character(part[[1]]), var3 = as.character(part[[2]]))
+#   }))
+# }, by = 1:nrow(morfo)][, .(var1, var2, var3)]
+# 
+# if(morfo[var2 == var3, .N] > 0)
+#   morfo[var2 == var3, var3 := NA]
+# 
+# morfo[,.N] == unique(morfo)[,.N] # hi ha duplicats
+# 
+# # comprovem els duplicats que hi ha
+# morfo[,.N, .(var1, var2, var3)][N>1]
+# dicc_can[wg_abbrev == 'Ovar' & grepl(morfo[,.N, .(var1, var2, var3)][N>1][, paste0(var2, '/', var3, collapse = '|')],
+#               definition, ignore.case = T) & grepl(morfo[,.N, .(var1, var2, var3)][N>1]$var1, definition, fixed = T), .(subcategory, definition)]
+# 
+# # tenim que els tumors d'endometri i de cèl·lules clares tenen la mateixa codificació, s'hauria d'aclarir
+# rm(prova, morfo)
 
 
 #### 7) pròstata ####
@@ -1458,6 +1463,9 @@ rm(skin)
 
 
 #### 9) estómac i esòfag #### 
+# 12/5/26: s'ha de corregir a la traducció que els càncers associats a tipustum = 3 són els elegibles, la resta
+# no es consideran elegibles per a la clasificació
+
 # treballem primer amb la taula candiag
 if(candiag[grepl('^C15|^C16', locatum, ignore.case = T),.N] > 0){
   # per aquest començarem a incorporar les subcategories i inclusions/exclusions
@@ -1840,34 +1848,45 @@ if(canpreva[grepl('^C15|^C16', locatum, ignore.case = T),.N] > 0){
 
 rm(stom, cat, morfo)
 
-# comprovem si hi ha algun codi duplicat
-prova <- dicc_can[wg_abbrev == 'Stom']$definition[1:13]
-prova <- gsub('Site ', '', gsub('+ ', ' & ', prova, fixed = T), fixed = T)
-prova <- gsub("'", '', prova)
-
-morfo <- as.data.table(do.call(rbind, strsplit(prova, split = '&', fixed = T)))
-morfo[, V1 := trimws(gsub("'", '', V1), which = 'both')]
-morfo[, V2 := trimws(gsub("'", '', gsub(',', '|', V2)), which = 'both')]
-morfo[V2 == 'missing', V2 := NA]
-
-morfo <- morfo[, {
-  codigos <- unlist(strsplit(V2, "\\|"))
-  temp <- data.table(var1 = V1, codigo = codigos)
-  temp[, c("var2", "var3") := tstrsplit(codigo, "/", fixed = TRUE)]
-  temp[, var2 := as.numeric(var2)]
-  temp[, var3 := fifelse(is.na(var3), NA, var3)]  # NA a cadena vacía
-  temp[, codigo := NULL]
-  temp
-}, by = 1:nrow(morfo)][, .(var1, var2, var3)]
-
-if(morfo[var2 == var3, .N] > 0)
-  morfo[var2 == var3, var3 := NA]
-
-morfo <- morfo[order(var1, var2, var3)]
-
-morfo[,.N] == unique(morfo)[,.N] # hi ha duplicats
-
-rm(prova, morfo)
+# # comprovem si hi ha algun codi duplicat
+# prova <- dicc_can[wg_abbrev == 'Stom']$definition[1:13]
+# prova <- gsub('Site ', '', gsub('+ ', ' & ', prova, fixed = T), fixed = T)
+# prova <- gsub("'", '', prova)
+# 
+# morfo <- as.data.table(do.call(rbind, strsplit(prova, split = '&', fixed = T)))
+# morfo[, V1 := trimws(gsub("'", '', V1), which = 'both')]
+# morfo[, V2 := trimws(gsub("'", '', gsub(',', '|', V2)), which = 'both')]
+# morfo[V2 == 'missing', V2 := NA]
+# 
+# morfo <- morfo[, {
+#   codigos <- unlist(strsplit(V2, "\\|"))
+#   temp <- data.table(var1 = V1, codigo = codigos)
+#   temp[, c("var2", "var3") := tstrsplit(codigo, "/", fixed = TRUE)]
+#   temp[, var2 := as.numeric(var2)]
+#   temp[, var3 := fifelse(is.na(var3), NA, var3)]  # NA a cadena vacía
+#   temp[, codigo := NULL]
+#   temp
+# }, by = 1:nrow(morfo)][, .(var1, var2, var3)]
+# 
+# if(morfo[var2 == var3, .N] > 0)
+#   morfo[var2 == var3, var3 := NA]
+# 
+# morfo <- morfo[order(var1, var2, var3)]
+# 
+# morfo[,.N] == unique(morfo)[,.N] # hi ha duplicats
+# 
+# morfo[,.N, .(var1, var2, var3)][N>1]
+# # com hi ha diversos, mostrem un a un
+# 
+# dicc_can[wg_abbrev == 'Stom' & grepl(morfo[,.N, .(var1, var2, var3)][N>1]$var2[1], definition, ignore.case = T) & 
+#            grepl(morfo[,.N, .(var1, var2, var3)][N>1]$var1[1], definition, fixed = T), .(subcategory, definition)]
+# dicc_can[wg_abbrev == 'Stom' & grepl(morfo[,.N, .(var1, var2, var3)][N>1]$var2[2], definition, ignore.case = T) & 
+#            grepl(morfo[,.N, .(var1, var2, var3)][N>1]$var1[2], definition, fixed = T), .(subcategory, definition)]
+# dicc_can[wg_abbrev == 'Stom' & grepl(morfo[,.N, .(var1, var2, var3)][N>1]$var2[3], definition, ignore.case = T) & 
+#            grepl(morfo[,.N, .(var1, var2, var3)][N>1]$var1[3], definition, fixed = T), .(subcategory, definition)]
+# # ens hem de quedar amb el primer grup que apareix, canviar-ho al codi de traducció si no s'ha incorporat ja
+# 
+# rm(prova, morfo)
 
 
 #### 10) tiroides #### 
