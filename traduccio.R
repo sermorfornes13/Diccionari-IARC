@@ -2413,7 +2413,7 @@ tot_diag[is.na(clas_iarc_cor) & !is.na(clas_iarc2), `:=`(clas_iarc_cor = clas_ia
                                                      clas_iarc2 = NA, subcateg2 = NA, inc_excl2 = NA)]
 
 candiag <- merge(candiag, tot_diag, by = c('id', 'datadiag', 'locatum', 'morfotum', 'tipustum'), all.x = T)
-candiag[is.na(clas_iarc) & !is.na(clas_iarc_cor), `:=`(clas_iarc = clas_iarc_cor, subcateg = subcateg_cor, inc_excl = inc_excl_cor, 
+candiag[(is.na(clas_iarc) | clas_iarc == 'Anyc') & !is.na(clas_iarc_cor), `:=`(clas_iarc = clas_iarc_cor, subcateg = subcateg_cor, inc_excl = inc_excl_cor, 
                                                      clas_iarc_cor = NA, subcateg_cor = NA, inc_excl_cor = NA)]
 candiag[, c("clas_iarc_cor", "subcateg_cor", "inc_excl_cor") := NULL]
 candiag <- unique(candiag)
@@ -2426,7 +2426,7 @@ tot_preva[is.na(clas_iarc_cor) & !is.na(clas_iarc2), `:=`(clas_iarc_cor = clas_i
                                                      clas_iarc2 = NA, subcateg2 = NA, inc_excl2 = NA)]
 
 canpreva <- merge(canpreva, tot_preva, by = c('id', 'datadiag', 'locatum', 'morfotum', 'tipustum'), all.x = T)
-canpreva[is.na(clas_iarc) & !is.na(clas_iarc_cor), `:=`(clas_iarc = clas_iarc_cor, subcateg = subcateg_cor, inc_excl = inc_excl_cor, 
+canpreva[(is.na(clas_iarc) | clas_iarc == 'Anyc') & !is.na(clas_iarc_cor), `:=`(clas_iarc = clas_iarc_cor, subcateg = subcateg_cor, inc_excl = inc_excl_cor, 
                                                      clas_iarc_cor = NA, subcateg_cor = NA, inc_excl_cor = NA)]
 canpreva[, c("clas_iarc_cor", "subcateg_cor", "inc_excl_cor") := NULL]
 canpreva <- unique(canpreva)
@@ -2801,7 +2801,7 @@ if(candiag[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
                                               subcateg3 = ifelse(is.na(subcateg3) & subcateg2 != aux[val == i]$subcateg, aux[val == i]$subcateg, subcateg3),
                                               subcateg4 = ifelse(is.na(subcateg4) & subcateg3 != aux[val == i]$subcateg, aux[val == i]$subcateg, subcateg4))]
     
-    live[get(i) == 1 & !is.na(subcateg), inc_excl := 'Included']
+    live[get(i) == 1 & !is.na(subcateg),  inc_excl  := 'Included']
     live[get(i) == 1 & !is.na(subcateg2), inc_excl2 := 'Included']
     live[get(i) == 1 & !is.na(subcateg3), inc_excl3 := 'Included']
     live[get(i) == 1 & !is.na(subcateg4), inc_excl4 := 'Included']
@@ -2809,22 +2809,35 @@ if(candiag[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
   
   # classifiquem els que queden pendents com a morfologia ineligible segons el diccionari
   live[is.na(subcateg), `:=`(subcateg = 'Morphology ineligible', inc_excl = 'Excluded')]
-
-  live_diag <- merge(candiag[, .(id, datadiag, locatum, morfotum, tipustum)], 
-                     live[, .(id, datadiag, locatum, morfotum, tipustum, clas_iarc,
-                                     subcateg, inc_excl)],
-                   by = c('id', 'datadiag', 'locatum', 'morfotum', 'tipustum'))
+  
+  # incorporem la informació a la taula candiag
+  live[!is.na(subcateg2), clas_iarc2 := clas_iarc]
+  live[!is.na(subcateg3), clas_iarc3 := clas_iarc]
+  live[!is.na(subcateg4), clas_iarc4 := clas_iarc]
+  setnames(live, paste0(rep(c('clas_iarc', 'subcateg', 'inc_excl'), 2), sort(rep(c('', 2), 3))),
+           paste0(rep(c('clas_iarc', 'subcateg', 'inc_excl'), 2), '_cor', sort(rep(c('', 2), 3))))
+  live <- live[order(id, datadiag, locatum, morfotum, tipustum), .(id, datadiag, locatum, morfotum, tipustum,
+                clas_iarc_cor, subcateg_cor, inc_excl_cor, clas_iarc_cor2, subcateg_cor2, inc_excl_cor2, 
+                clas_iarc3, subcateg3, inc_excl3, clas_iarc4, subcateg4, inc_excl4)]
+  
+  candiag <- merge(candiag, live, by = c('id', 'datadiag', 'locatum', 'morfotum', 'tipustum'), all.x = T)
+  candiag[(is.na(clas_iarc) | clas_iarc == 'Anyc') & !is.na(clas_iarc_cor), `:=`(clas_iarc = clas_iarc_cor, subcateg = subcateg_cor, inc_excl = inc_excl_cor)]
+  candiag[is.na(clas_iarc2) & !is.na(clas_iarc_cor2), `:=`(clas_iarc2 = clas_iarc_cor2, subcateg2 = subcateg_cor2, inc_excl2 = inc_excl_cor2)]
+  candiag[, c(names(candiag)[grepl('_cor', names(candiag))]) := NULL]
+  
+  rm(list = ls(pattern = 'd_'))
+  
 }
 
 # ho repetim a la taula canpreva
 if(canpreva[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
   # per aquest començarem a incorporar les subcategories i inclusions/exclusions
   live <- copy(canpreva[grepl('^C22|^C23|^C24', locatum, ignore.case = T), 
-                       .(id, datadiag, locatum, morfotum, tipustum, defcancer1, clas_iarc = 'Live')])
+                        .(id, datadiag, locatum, morfotum, tipustum, clas_iarc = 'Live')])
   
   # carcinoma hepatocel·lular
   cat <- dicc_can[wg_abbrev == 'Live' & subcategory == 'HCC- Hepatocellular carcinoma']$definition
-  cat <- gsub(' and Basis_preva1 not in (.,53,54,56,60)', '', cat, fixed = T)
+  cat <- gsub(' and Basis_diag1 not in (.,53,54,56,60)', '', cat, fixed = T)
   cat <- gsub('Site eq ', '', gsub('and Morpho in', '&', cat))
   cat <- gsub(' or ', '|', gsub('\n', '', cat))
   
@@ -2844,20 +2857,14 @@ if(canpreva[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
   live <- merge(live, d_hcc[, .(locatum = var1, morfotum = var2, tipustum = var3, hcc = 1)], 
                 by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
   
-  # 28/4/26: incloem correccions per la variable basis_preva1 (defcancer1 per a nosaltres)
-  live[!is.na(hcc) & locatum == 'C220' & morfotum %in% d_hcc[var1 == 'C220']$var2 & tipustum == 3 & 
-         defcancer1 %in% c(53,54,56,60), hcc := 0]
-  live[!is.na(hcc) & locatum == 'C221' & morfotum %in% d_hcc[var1 == 'C221']$var2 & tipustum == 3 & 
-         defcancer1 %in% c(53,54,56,60), hcc := 0]
-  
   # carcinoma hepatocel·lular, definició més laxa
   cat <- dicc_can[wg_abbrev == 'Live' & subcategory %in% c('HCC- Hepatocellular carcinoma',
                                                            'HCC_Wide - Hepatocellular carcinoma (wider definition)')]$definition
   cat <- gsub('as above + ', '', cat, fixed = T)
   cat <- gsub('If ', '', cat, fixed = T)
   cat <- gsub(' and Lab_Afp* ge 12', '', cat, fixed = T)
-  cat <- gsub(' and Basis_preva1 not in (.,53,54,56,60)', '', cat, fixed = T)
-  cat <- gsub(' and Basis_preva1 in (20,25,50,55,70)', '', cat, fixed = T)
+  cat <- gsub(' and Basis_diag1 not in (.,53,54,56,60)', '', cat, fixed = T)
+  cat <- gsub(' and Basis_diag1 in (20,25,50,55,70)', '', cat, fixed = T)
   cat <- gsub('Site eq ', '', gsub('and Morpho in', '&', cat))
   cat <- gsub(' or ', '|', gsub('\n', '', cat))
   
@@ -2881,17 +2888,9 @@ if(canpreva[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
   live <- merge(live, d_hcc_w[, .(locatum = var1, morfotum = var2, tipustum = var3, hcc_w = 1)], 
                 by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
   
-  # 28/4/26: incloem correccions per la variable basis_preva1 (defcancer1 per a nosaltres)
-  live[!is.na(hcc_w) & locatum == 'C220' & morfotum %in% d_hcc_w[var1 == 'C220']$var2 & tipustum == 3 & 
-         defcancer1 %in% c(53,54,56,60), hcc_w := 0]
-  live[!is.na(hcc_w) & locatum == 'C221' & morfotum %in% d_hcc_w[var1 == 'C220']$var2 & tipustum == 3 & 
-         defcancer1 %in% c(53,54,56,60), hcc_w := 0]
-  live[!is.na(hcc_w) & locatum == 'C220' & morfotum %in% c(8000, 8010) & tipustum == 3 & 
-         !defcancer1 %in% c(20,25,50,55,70), hcc_w := 0]
-  
   # conducte biliar
   cat <- dicc_can[wg_abbrev == 'Live' & subcategory == 'IBD - Intrahepatic bile duct']$definition
-  cat <- gsub(' and Basis_preva1 not in (.,53,54,56,60)', '', cat, fixed = T)
+  cat <- gsub(' and Basis_diag1 not in (.,53,54,56,60)', '', cat, fixed = T)
   cat <- gsub('If Site eq ', '', gsub('and Morpho in', '&', cat))
   cat <- gsub(' or ', '|', gsub('\n', '', cat))
   
@@ -2911,16 +2910,10 @@ if(canpreva[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
   live <- merge(live, d_ibd[, .(locatum = var1, morfotum = var2, tipustum = var3, ibd = 1)], 
                 by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
   
-  # 28/4/26: incloem correccions per la variable basis_preva1 (defcancer1 per a nosaltres)
-  live[!is.na(ibd) & locatum == 'C220' & morfotum %in% d_ibd[var1 == 'C220']$var2 & tipustum == 3 & 
-         defcancer1 %in% c(53,54,56,60), ibd := 0]
-  live[!is.na(ibd) & locatum == 'C221' & morfotum %in% d_ibd[var1 == 'C221']$var2 & tipustum == 3 & 
-         defcancer1 %in% c(53,54,56,60), ibd := 0]
-  
   # vesícula biliar i conducte biliar
   cat <- dicc_can[wg_abbrev == 'Live' & subcategory == 'GBT - Gallbladder and biliary tract']$definition
-  cat <- gsub(' and Basis_preva1 not in (.,53,54,56,60)', '', cat, fixed = T)
-  cat <- gsub(' and Basis_preva1 not in (.,27,53,54,56,60)', '', cat, fixed = T)
+  cat <- gsub(' and Basis_diag1 not in (.,53,54,56,60)', '', cat, fixed = T)
+  cat <- gsub(' and Basis_diag1 not in (.,27,53,54,56,60)', '', cat, fixed = T)
   cat <- gsub('If Site eq ', '', gsub('and Morpho in', '&', cat))
   cat <- gsub(' or', '|', gsub('\n', '', cat))
   
@@ -2940,21 +2933,9 @@ if(canpreva[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
   live <- merge(live, d_gbt[, .(locatum = var1, morfotum = var2, tipustum = var3, gbt = 1)], 
                 by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
   
-  # 28/4/26: incloem correccions per la variable basis_preva1 (defcancer1 per a nosaltres)
-  live[!is.na(gbt) & locatum == 'C221' & morfotum %in% d_gbt[var1 == 'C221']$var2 & tipustum == 3 & 
-         defcancer1 %in% c(53,54,56,60), gbt := 0]
-  live[!is.na(gbt) & locatum == 'C239' & morfotum %in% 8000 & tipustum == 3 & 
-         defcancer1 %in% c(27,53,54,56,60), gbt := 0]
-  live[!is.na(gbt) & locatum == 'C239' & morfotum %in% d_gbt[var1 == 'C239' & var2 != 8000]$var2 & tipustum == 3 & 
-         defcancer1 %in% c(53,54,56,60), gbt := 0]
-  live[!is.na(gbt) & locatum == 'C240' & morfotum %in% d_gbt[var1 == 'C240']$var2 & tipustum == 3 & 
-         defcancer1 %in% c(53,54,56,60), gbt := 0]
-  live[!is.na(gbt) & locatum == 'C248' & morfotum %in% d_gbt[var1 == 'C248']$var2 & tipustum == 3 & 
-         defcancer1 %in% c(53,54,56,60), gbt := 0]
-  
   # conducte biliar extrahepàtic
   cat <- dicc_can[wg_abbrev == 'Live' & subcategory == 'EBD - Extra-hepatic bile duct']$definition
-  cat <- gsub(' and Basis_preva1 not in (.,53,54,56,60)', '', cat, fixed = T)
+  cat <- gsub(' and Basis_diag1 not in (.,53,54,56,60)', '', cat, fixed = T)
   cat <- gsub('If Site eq ', '', gsub('and Morpho in', '&', cat))
   cat <- gsub(' or', '|', gsub('\n', '', cat))
   
@@ -2974,14 +2955,10 @@ if(canpreva[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
   live <- merge(live, d_ebd[, .(locatum = var1, morfotum = var2, tipustum = var3, ebd = 1)], 
                 by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
   
-  # 28/4/26: incloem correccions per la variable basis_preva1 (defcancer1 per a nosaltres)
-  live[!is.na(ebd) & locatum == 'C240' & morfotum %in% d_ebd[var1 == 'C240']$var2 & tipustum == 3 & 
-         defcancer1 %in% c(53,54,56,60), ebd := 0]
-  
   # vesícula biliar
   cat <- dicc_can[wg_abbrev == 'Live' & subcategory == 'Gallblad- Gall bladder']$definition
-  cat <- gsub(' and Basis_preva1 not in (.,27,53,54,56,60)', '', cat, fixed = T)
-  cat <- gsub(' and Basis_preva1 not in (.,53,54,56,60)', '', cat, fixed = T)
+  cat <- gsub(' and Basis_diag1 not in (.,27,53,54,56,60)', '', cat, fixed = T)
+  cat <- gsub(' and Basis_diag1 not in (.,53,54,56,60)', '', cat, fixed = T)
   cat <- gsub('If Site eq ', '', gsub('and Morpho in', '&', cat))
   cat <- gsub(' or', '|', gsub('\n', '', cat))
   
@@ -3001,15 +2978,9 @@ if(canpreva[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
   live <- merge(live, d_gallblad[, .(locatum = var1, morfotum = var2, tipustum = var3, gallblad = 1)], 
                 by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
   
-  # 28/4/26: incloem correccions per la variable basis_preva1 (defcancer1 per a nosaltres)
-  live[!is.na(gallblad) & locatum == 'C239' & morfotum %in% 8000 & tipustum == 3 & 
-         defcancer1 %in% c(27,53,54,56,60), gallblad := 0]
-  live[!is.na(gallblad) & locatum == 'C239' & morfotum %in% d_gallblad[var1 == 'C239' & var2 != 8000]$var2 & tipustum == 3 & 
-         defcancer1 %in% c(53,54,56,60), gallblad := 0]
-  
   # ampolla de vater
   cat <- dicc_can[wg_abbrev == 'Live' & subcategory == 'AOV- Ampulla of Vater']$definition
-  cat <- gsub(' and Basis_preva1 not in (.,53,54,56,60)', '', cat, fixed = T)
+  cat <- gsub(' and Basis_diag1 not in (.,53,54,56,60)', '', cat, fixed = T)
   cat <- gsub('If Site eq ', '', gsub('and Morpho in', '&', cat))
   cat <- gsub(' or', '|', gsub('\n', '', cat))
   
@@ -3029,13 +3000,9 @@ if(canpreva[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
   live <- merge(live, d_aov[, .(locatum = var1, morfotum = var2, tipustum = var3, aov = 1)], 
                 by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
   
-  # 28/4/26: incloem correccions per la variable basis_preva1 (defcancer1 per a nosaltres)
-  live[!is.na(aov) & locatum == 'C241' & morfotum %in% d_aov[var1 == 'C241']$var2 & tipustum == 3 & 
-         defcancer1 %in% c(53,54,56,60), aov := 0]
-  
   # colangiocarcinoma intrahepàtic
   cat <- dicc_can[wg_abbrev == 'Live' & subcategory == 'CCA - Intra-hepatic cholangiocarcinomas']$definition
-  cat <- gsub(' and Basis_preva1 not in (.,53,54,56,60)', '', cat, fixed = T)
+  cat <- gsub(' and Basis_diag1 not in (.,53,54,56,60)', '', cat, fixed = T)
   cat <- gsub('If Site eq ', '', gsub('and Morpho in', '&', cat))
   cat <- gsub(' or', '|', gsub('\n', '', cat))
   
@@ -3055,16 +3022,10 @@ if(canpreva[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
   live <- merge(live, d_cca[, .(locatum = var1, morfotum = var2, tipustum = var3, cca = 1)], 
                 by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
   
-  # 28/4/26: incloem correccions per la variable basis_preva1 (defcancer1 per a nosaltres)
-  live[!is.na(cca) & locatum == 'C220' & morfotum %in% d_cca[var1 == 'C220']$var2 & tipustum == 3 & 
-         defcancer1 %in% c(53,54,56,60), cca := 0]
-  live[!is.na(cca) & locatum == 'C221' & morfotum %in% d_cca[var1 == 'C221']$var2 & tipustum == 3 & 
-         defcancer1 %in% c(53,54,56,60), cca := 0]
-  
   # colangiocarcinomas extrahepàtic
   cat <- dicc_can[wg_abbrev == 'Live' & subcategory == 'CCA - Extrahepatic cholangiocarcinomas']$definition
-  cat <- gsub(' and Basis_preva1 not in (.,27,53,54,56,60)', '', cat, fixed = T)
-  cat <- gsub(' and Basis_preva1 not in (.,53,54,56,60)', '', cat, fixed = T)
+  cat <- gsub(' and Basis_diag1 not in (.,27,53,54,56,60)', '', cat, fixed = T)
+  cat <- gsub(' and Basis_diag1 not in (.,53,54,56,60)', '', cat, fixed = T)
   cat <- gsub('If Site eq ', '', gsub('and Morpho in', '&', cat))
   cat <- gsub(' or', '|', gsub('\n', '', cat))
   
@@ -3084,21 +3045,9 @@ if(canpreva[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
   live <- merge(live, d_cca_ex[, .(locatum = var1, morfotum = var2, tipustum = var3, cca_ex = 1)], 
                 by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
   
-  # 28/4/26: incloem correccions per la variable basis_preva1 (defcancer1 per a nosaltres)
-  live[!is.na(cca_ex) & locatum == 'C221' & morfotum %in% d_cca_ex[var1 == 'C221'] & tipustum == 3 & 
-         defcancer1 %in% c(53,54,56,60), cca_ex := 0]
-  live[!is.na(cca_ex) & locatum == 'C239' & morfotum %in% d_cca_ex[var1 == 'C239'] & tipustum == 3 & 
-         defcancer1 %in% c(27,53,54,56,60), cca_ex := 0]
-  live[!is.na(cca_ex) & locatum == 'C240' & morfotum %in% d_cca_ex[var1 == 'C240'] & tipustum == 3 & 
-         defcancer1 %in% c(53,54,56,60), cca_ex := 0]
-  live[!is.na(cca_ex) & locatum == 'C248' & morfotum %in% d_cca_ex[var1 == 'C248'] & tipustum == 3 & 
-         defcancer1 %in% c(53,54,56,60), cca_ex := 0]
-  live[!is.na(cca_ex) & locatum == 'C249' & morfotum %in% d_cca_ex[var1 == 'C249'] & tipustum == 3 & 
-         defcancer1 %in% c(53,54,56,60), cca_ex := 0]
-  
   # colangiocarcinomas extrahepàtic perihilar
   cat <- dicc_can[wg_abbrev == 'Live' & subcategory == 'Perihilar extrahepatic cholangiocarcinomas']$definition
-  cat <- gsub(' and Basis_preva1 not in (.,53,54,56,60)', '', cat, fixed = T)
+  cat <- gsub(' and Basis_diag1 not in (.,53,54,56,60)', '', cat, fixed = T)
   cat <- gsub('If Site eq ', '', gsub('and Morpho in', '&', cat))
   cat <- gsub(' or', '|', gsub('\n', '', cat))
   
@@ -3118,17 +3067,9 @@ if(canpreva[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
   live <- merge(live, d_pec[, .(locatum = var1, morfotum = var2, tipustum = var3, pec = 1)], 
                 by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
   
-  # 28/4/26: incloem correccions per la variable basis_preva1 (defcancer1 per a nosaltres)
-  live[!is.na(pec) & locatum == 'C221' & morfotum %in% d_pec[var1 == 'C221']$var2 & tipustum == 3 & 
-         defcancer1 %in% c(53,54,56,60), pec := 0]
-  live[!is.na(pec) & locatum == 'C240' & morfotum %in% d_pec[var1 == 'C240']$var2 & tipustum == 3 & 
-         defcancer1 %in% c(53,54,56,60), pec := 0]
-  live[!is.na(pec) & locatum == 'C249' & morfotum %in% d_pec[var1 == 'C249']$var2 & tipustum == 3 & 
-         defcancer1 %in% c(53,54,56,60), pec := 0]
-  
   # colangiocarcinomas extrahepàtic distal
   cat <- dicc_can[wg_abbrev == 'Live' & subcategory == 'Distal extrahepatic cholangiocarcinomas ']$definition
-  cat <- gsub(' and Basis_preva1 not in (.,53,54,56,60)', '', cat, fixed = T)
+  cat <- gsub(' and Basis_diag1 not in (.,53,54,56,60)', '', cat, fixed = T)
   cat <- gsub('If Site eq ', '', gsub('and Morpho in', '&', cat))
   cat <- gsub(' or', '|', gsub('\n', '', cat))
   
@@ -3147,16 +3088,6 @@ if(canpreva[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
   
   live <- merge(live, d_dec[, .(locatum = var1, morfotum = var2, tipustum = var3, dec = 1)], 
                 by = c('locatum', 'morfotum', 'tipustum'), all.x = T)
-  
-  # 28/4/26: incloem correccions per la variable basis_preva1 (defcancer1 per a nosaltres)
-  live[!is.na(dec) & locatum == 'C239' & morfotum %in% d_dec[var1 == 'C239'] & tipustum == 3 & 
-         defcancer1 %in% c(53,54,56,60), dec := 0]
-  live[!is.na(dec) & locatum == 'C240' & morfotum %in% d_dec[var1 == 'C240'] & tipustum == 3 & 
-         defcancer1 %in% c(53,54,56,60), dec := 0]
-  live[!is.na(dec) & locatum == 'C248' & morfotum %in% d_dec[var1 == 'C248'] & tipustum == 3 & 
-         defcancer1 %in% c(53,54,56,60), dec := 0]
-  live[!is.na(dec) & locatum == 'C249' & morfotum %in% d_dec[var1 == 'C249'] & tipustum == 3 & 
-         defcancer1 %in% c(53,54,56,60), dec := 0]
   
   # morfologia missing
   live[, morpho_mis := ifelse(is.na(morfotum), 1, NA)]
@@ -3181,7 +3112,7 @@ if(canpreva[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
                                               subcateg3 = ifelse(is.na(subcateg3) & subcateg2 != aux[val == i]$subcateg, aux[val == i]$subcateg, subcateg3),
                                               subcateg4 = ifelse(is.na(subcateg4) & subcateg3 != aux[val == i]$subcateg, aux[val == i]$subcateg, subcateg4))]
     
-    live[get(i) == 1 & !is.na(subcateg), inc_excl := 'Included']
+    live[get(i) == 1 & !is.na(subcateg),  inc_excl  := 'Included']
     live[get(i) == 1 & !is.na(subcateg2), inc_excl2 := 'Included']
     live[get(i) == 1 & !is.na(subcateg3), inc_excl3 := 'Included']
     live[get(i) == 1 & !is.na(subcateg4), inc_excl4 := 'Included']
@@ -3190,10 +3121,23 @@ if(canpreva[grepl('^C22|^C23|^C24', locatum, ignore.case = T),.N] > 0){
   # classifiquem els que queden pendents com a morfologia ineligible segons el diccionari
   live[is.na(subcateg), `:=`(subcateg = 'Morphology ineligible', inc_excl = 'Excluded')]
   
-  live_preva <- merge(canpreva[, .(id, datadiag, locatum, morfotum, tipustum)], 
-                     live[, .(id, datadiag, locatum, morfotum, tipustum, clas_iarc,
-                              subcateg, inc_excl)],
-                     by = c('id', 'datadiag', 'locatum', 'morfotum', 'tipustum'))
+  # incorporem la informació a la taula canpreva
+  live[!is.na(subcateg2), clas_iarc2 := clas_iarc]
+  live[!is.na(subcateg3), clas_iarc3 := clas_iarc]
+  live[!is.na(subcateg4), clas_iarc4 := clas_iarc]
+  setnames(live, paste0(rep(c('clas_iarc', 'subcateg', 'inc_excl'), 2), sort(rep(c('', 2), 3))),
+           paste0(rep(c('clas_iarc', 'subcateg', 'inc_excl'), 2), '_cor', sort(rep(c('', 2), 3))))
+  live <- live[order(id, datadiag, locatum, morfotum, tipustum), .(id, datadiag, locatum, morfotum, tipustum,
+                                                                   clas_iarc_cor, subcateg_cor, inc_excl_cor, clas_iarc_cor2, subcateg_cor2, inc_excl_cor2, 
+                                                                   clas_iarc3, subcateg3, inc_excl3, clas_iarc4, subcateg4, inc_excl4)]
+  
+  canpreva <- merge(canpreva, live, by = c('id', 'datadiag', 'locatum', 'morfotum', 'tipustum'), all.x = T)
+  canpreva[(is.na(clas_iarc) | clas_iarc == 'Anyc') & !is.na(clas_iarc_cor), `:=`(clas_iarc = clas_iarc_cor, subcateg = subcateg_cor, inc_excl = inc_excl_cor)]
+  canpreva[is.na(clas_iarc2) & !is.na(clas_iarc_cor2), `:=`(clas_iarc2 = clas_iarc_cor2, subcateg2 = subcateg_cor2, inc_excl2 = inc_excl_cor2)]
+  canpreva[, c(names(canpreva)[grepl('_cor', names(canpreva))]) := NULL]
+  
+  rm(list = ls(pattern = 'd_'))
+  
 }
 
 rm(live, aov, cat, cca, cca_ex, dec, ebd, gallblad, gbt, hcc, hcc_w, ibd, morfo, pec, vars_to_modif)
@@ -3291,10 +3235,46 @@ cat <- dicc_can[wg_abbrev == 'Leuk']$code
 cat <- gsub("Morphology=", '', cat, fixed = T)
 morfo <- unlist(strsplit(cat, split = ',', fixed = T))
 
-candiag[grepl(paste0('^', morfo, collapse = '|'), morfotum, ignore.case = T), `:=`(clas_iarc = 'Leuk', inc_excl = 'Included')]
-canpreva[grepl(paste0('^', morfo, collapse = '|'), morfotum, ignore.case = T), `:=`(clas_iarc = 'Leuk', inc_excl = 'Included')]
+# 19/5/26: hem d'incorporar la informació dels linfomes i de leucèmia
+# cal treballar les dades que tenim ja recollides de linformes per treballar els duplicats que s'inclouen al grup de leucèmia
 
-rm(cat, morfo)
+# treballem primer amb la taula candiag
+{
+  leuk_diag <- copy(candiag[grepl(paste0('^', morfo, collapse = '|'), morfotum, ignore.case = T),
+                            .(id, datadiag, locatum, morfotum, tipustum, clas_iarc = 'Leuk', subcateg = NA, inc_excl = 'Included')])
+  
+  leuk_lymp <- merge(lymp_diag, leuk_diag, by = c('id', 'datadiag', 'locatum', 'morfotum', 'tipustum'), all = T)
+  setnames(leuk_lymp, names(leuk_lymp[, clas_iarc.x:inc_excl.y]), paste0(rep(c('clas_iarc', 'subcateg', 'inc_excl'), 2),
+                                                                         '_cor', sort(rep(c('', 2), 3))))
+  leuk_lymp[is.na(clas_iarc_cor) & !is.na(clas_iarc_cor2), `:=`(clas_iarc_cor = clas_iarc_cor2, clas_iarc_cor2 = NA, 
+                                                                subcateg_cor = subcateg_cor2, subcateg_cor2 = NA, inc_excl_cor = inc_excl_cor2, inc_excl_cor2 = NA)]
+  
+  candiag <- merge(candiag, leuk_lymp, by = c('id', 'datadiag', 'locatum', 'morfotum', 'tipustum'), all.x = T)
+  candiag[(is.na(clas_iarc) | clas_iarc == 'Anyc') & !is.na(clas_iarc_cor), `:=`(clas_iarc = clas_iarc_cor, subcateg = subcateg_cor, inc_excl = inc_excl_cor)]
+  candiag[is.na(clas_iarc2) & !is.na(clas_iarc_cor2), `:=`(clas_iarc2 = clas_iarc_cor2, subcateg2 = subcateg_cor2, inc_excl2 = inc_excl_cor2)]
+  candiag[, c(names(candiag)[grepl('_cor', names(candiag))]) := NULL]
+  
+}
+
+# ho repetim a la taula canpreva
+{
+  leuk_preva <- copy(canpreva[grepl(paste0('^', morfo, collapse = '|'), morfotum, ignore.case = T),
+                            .(id, datadiag, locatum, morfotum, tipustum, clas_iarc = 'Leuk', subcateg = NA, inc_excl = 'Included')])
+  
+  leuk_lymp <- merge(lymp_preva, leuk_preva, by = c('id', 'datadiag', 'locatum', 'morfotum', 'tipustum'), all = T)
+  setnames(leuk_lymp, names(leuk_lymp[, clas_iarc.x:inc_excl.y]), paste0(rep(c('clas_iarc', 'subcateg', 'inc_excl'), 2),
+                                                                         '_cor', sort(rep(c('', 2), 3))))
+  leuk_lymp[is.na(clas_iarc_cor) & !is.na(clas_iarc_cor2), `:=`(clas_iarc_cor = clas_iarc_cor2, clas_iarc_cor2 = NA, 
+                                                                subcateg_cor = subcateg_cor2, subcateg_cor2 = NA, inc_excl_cor = inc_excl_cor2, inc_excl_cor2 = NA)]
+  
+  canpreva <- merge(canpreva, leuk_lymp, by = c('id', 'datadiag', 'locatum', 'morfotum', 'tipustum'), all.x = T)
+  canpreva[(is.na(clas_iarc) | clas_iarc == 'Anyc') & !is.na(clas_iarc_cor), `:=`(clas_iarc = clas_iarc_cor, subcateg = subcateg_cor, inc_excl = inc_excl_cor)]
+  canpreva[is.na(clas_iarc2) & !is.na(clas_iarc_cor2), `:=`(clas_iarc2 = clas_iarc_cor2, subcateg2 = subcateg_cor2, inc_excl2 = inc_excl_cor2)]
+  canpreva[, c(names(canpreva)[grepl('_cor', names(canpreva))]) := NULL]
+  
+}
+
+rm(cat, morfo, leuk_diag, leuk_lymp, lymp_diag, lymp_preva)
 
 # no cal fer comprovació de duplicitat, ja que els codis són excloents
 
